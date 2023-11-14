@@ -566,6 +566,7 @@ FLOWS = {
         "twitch",
         "ukraine_alarm",
         "unifi",
+        "unifi_access",
         "unifiprotect",
         "upb",
         "upcloud",

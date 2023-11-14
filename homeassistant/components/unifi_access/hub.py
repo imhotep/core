@@ -1,0 +1,263 @@
+"""Unifi Access Hub.
+
+This module interacts with the Unifi Access API server.
+"""
+import asyncio
+import json
+import logging
+import ssl
+from threading import Thread
+from urllib.parse import urlparse
+
+from requests import request
+from requests.exceptions import ConnectionError as ConnError, SSLError
+import urllib3
+import websocket
+
+from homeassistant.core import HomeAssistant
+from homeassistant.exceptions import ConfigEntryAuthFailed
+from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
+
+from .const import (
+    DEVICE_NOTIFICATIONS_URL,
+    DOOR_UNLOCK_URL,
+    DOORS_URL,
+    UNIFI_ACCESS_API_PORT,
+)
+from .door import UnifiAccessDoor
+
+_LOGGER = logging.getLogger(__name__)
+
+
+class ApiAuthError(Exception):
+    """Raised when we can't authenticate with the API Token."""
+
+
+class ApiError(Exception):
+    """Raised when we have some trouble using the API."""
+
+
+class UnifiAccessHub:
+    """UnifiAccessHub.
+
+    This class takes care of interacting with the Unifi Access API.
+    """
+
+    def __init__(self, host: str, verify_ssl: bool = False) -> None:
+        """Initialize."""
+        self.verify_ssl = verify_ssl
+        if self.verify_ssl is False:
+            _LOGGER.warning("SSL Verification disabled for %s", host)
+            urllib3.disable_warnings()
+
+        host_parts = host.split(":")
+        parsed_host = urlparse(host)
+
+        hostname = parsed_host.hostname if parsed_host.hostname else host_parts[0]
+        port = (
+            parsed_host.port
+            if parsed_host.port
+            else (host_parts[1] if len(host_parts) > 1 else UNIFI_ACCESS_API_PORT)
+        )
+        self._api_token = None
+        self.host = f"https://{hostname}:{port}"
+        self._http_headers = {
+            "Accept": "application/json",
+            "Content-Type": "application/json",
+        }
+        self.websocket_host = f"wss://{hostname}:{port}"
+        self._websocket_headers = {
+            "Upgrade": "websocket",
+            "Connection": "Upgrade",
+        }
+        self._doors: dict[str, UnifiAccessDoor] = {}
+        self.update_t = None
+
+    @property
+    def doors(self):
+        """Get current doors."""
+        return self._doors
+
+    def set_api_token(self, api_token):
+        """Set API Access Token."""
+        self._api_token = api_token
+        self._http_headers["Authorization"] = f"Bearer {self._api_token}"
+        self._websocket_headers["Authorization"] = f"Bearer {self._api_token}"
+
+    def update(self):
+        """Get latest door data."""
+        _LOGGER.info("Getting door updates from Unifi Access %s", self.host)
+        if self.update_t is None:
+            self.start_updates()
+        data = self._make_http_request(f"{self.host}{DOORS_URL}")
+
+        for _i, door in enumerate(data):
+            door_id = door["id"]
+            if door_id in self.doors:
+                existing_door = self.doors[door_id]
+                existing_door.name = door["name"]
+                existing_door.door_position_status = door["door_position_status"]
+                existing_door.door_lock_relay_status = door["door_lock_relay_status"]
+                existing_door.publish_updates()
+            elif door["is_bind_hub"] is True:
+                self._doors[door_id] = UnifiAccessDoor(
+                    door_id=door["id"],
+                    name=door["name"],
+                    door_position_status=door["door_position_status"],
+                    door_lock_relay_status=door["door_lock_relay_status"],
+                    hub=self,
+                )
+        return self._doors
+
+    def update_door(self, door_id: int) -> None:
+        """Get latest door data for a specific door."""
+        _LOGGER.info("Getting door update from Unifi Access with id %s", door_id)
+        self._make_http_request(f"{self.host}{DOORS_URL}/{door_id}")
+
+    def authenticate(self, api_token: str) -> str:
+        """Test if we can authenticate with the host."""
+        self.set_api_token(api_token)
+        _LOGGER.info("Authenticating %s", self.host)
+        try:
+            self.update()
+        except ApiError:
+            _LOGGER.error(
+                "Could perform action with %s. Check host and token", self.host
+            )
+            return "api_error"
+        except ApiAuthError:
+            _LOGGER.error(
+                "Could not authenticate with %s. Check host and token", self.host
+            )
+            return "api_auth_error"
+        except SSLError:
+            _LOGGER.error("Error validating SSL Certificate for %s", self.host)
+            return "ssl_error"
+        except ConnError:
+            _LOGGER.error("Cannot connect to %s", self.host)
+            return "cannot_connect"
+
+        return "ok"
+
+    def unlock_door(self, door_id: str) -> None:
+        """Test if we can authenticate with the host."""
+        _LOGGER.info("Unlocking door with id %s", door_id)
+        self._make_http_request(
+            f"{self.host}{DOOR_UNLOCK_URL}".format(door_id=door_id), "PUT"
+        )
+
+    def _make_http_request(self, url, method="GET") -> None:
+        """Make HTTP request to Unifi Access API server."""
+        r = request(
+            method,
+            url,
+            headers=self._http_headers,
+            verify=self.verify_ssl,
+            timeout=10,
+        )
+
+        if r.status_code == 401:
+            raise ApiAuthError
+
+        if r.status_code != 200:
+            raise ApiError
+
+        response = r.json()
+
+        return response["data"]
+
+    def on_message(self, wsap, message):
+        """Handle messages received on the websocket client."""
+        # _LOGGER.info(f"Got update {message}")
+        if "Hello" not in message:
+            update = json.loads(message)
+            match update["event"]:
+                case "access.dps_change":
+                    door_id = update["data"]["door_id"]
+                    _LOGGER.info("DPS Change %s", door_id)
+                    if door_id in self.doors:
+                        existing_door: UnifiAccessDoor = self.doors[door_id]
+                        existing_door.door_position_status = update["data"]["status"]
+                        existing_door.publish_updates()
+                        _LOGGER.info("DPS Change Updated")
+                case "access.data.device.remote_unlock":
+                    door_id = update["data"]["unique_id"]
+                    _LOGGER.info("Remote Unlock %s", door_id)
+                    if door_id in self.doors:
+                        existing_door: UnifiAccessDoor = self.doors[door_id]
+                        existing_door.door_lock_relay_status = "unlock"
+                        existing_door.publish_updates()
+                        _LOGGER.info("Remote Unlock Updated")
+                case "access.data.device.update":
+                    door_id = update["data"]["door"]["unique_id"]
+                    _LOGGER.info("Device Update %s", door_id)
+                    if door_id in self.doors:
+                        existing_door: UnifiAccessDoor = self.doors[door_id]
+                        self.update_door(door_id)
+                        existing_door.publish_updates()
+                        _LOGGER.info("Device Updated")
+                case "access.remote_view":
+                    door_id = update["event_object_id"]
+                    _LOGGER.info("Doorbell Press %s", door_id)
+                    if door_id in self.doors:
+                        existing_door: UnifiAccessDoor = self.doors[door_id]
+                        existing_door.doorbell_pressed = True
+                        existing_door.publish_updates()
+                        _LOGGER.info("Doorbell Pressed Updated")
+                case "access.remote_view.change":
+                    door_id = update["event_object_id"]
+                    _LOGGER.info("Doorbell Press Stopped %s", door_id)
+                    if door_id in self.doors:
+                        existing_door: UnifiAccessDoor = self.doors[door_id]
+                        existing_door.doorbell_pressed = False
+                        existing_door.publish_updates()
+                        _LOGGER.info("Doorbell Press Stopped")
+
+    def on_error(self, wsap, error):
+        """Handle errors in the websocket client."""
+        _LOGGER.error("Got error %s", error)
+
+    def start_updates(self):
+        """Start listening for updates in a separate thread using websocket-client."""
+        self.update_t = Thread(target=self.listen_for_updates)
+        self.update_t.daemon = True
+        self.update_t.start()
+
+    def listen_for_updates(self):
+        """Create a websocket client and start listening for updates."""
+        uri = f"{self.websocket_host}{DEVICE_NOTIFICATIONS_URL}"
+        _LOGGER.info("Listening for updates on %s", uri)
+        ws = websocket.WebSocketApp(
+            uri,
+            header=self._websocket_headers,
+            on_message=self.on_message,
+            on_error=self.on_error,
+        )
+        sslopt = None
+        if self.verify_ssl is False:
+            sslopt = {"cert_reqs": ssl.CERT_NONE}
+        ws.run_forever(sslopt=sslopt)
+
+
+class UnifiAccessCoordinator(DataUpdateCoordinator):
+    """Unifi Access Coordinator. This is mostly used for local polling."""
+
+    def __init__(self, hass: HomeAssistant, hub) -> None:
+        """Initialize Unifi Access Coordinator."""
+        super().__init__(
+            hass,
+            _LOGGER,
+            name="Unifi Access Coordinator",
+            # update_interval=timedelta(seconds=3),
+        )
+        self.hub = hub
+
+    async def _async_update_data(self):
+        """Handle Unifi Access Coordinator updates."""
+        try:
+            async with asyncio.timeout(10):
+                return await self.hass.async_add_executor_job(self.hub.update)
+        except ApiAuthError as err:
+            raise ConfigEntryAuthFailed from err
+        except ApiError as err:
+            raise UpdateFailed("Error communicating with API") from err
