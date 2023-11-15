@@ -21,6 +21,7 @@ STEP_USER_DATA_SCHEMA = vol.Schema(
         vol.Required("host"): str,
         vol.Required("api_token"): str,
         vol.Required("verify_ssl"): bool,
+        vol.Required("use_polling"): bool,
     }
 )
 
@@ -31,7 +32,7 @@ async def validate_input(hass: HomeAssistant, data: dict[str, Any]) -> dict[str,
     Data has the keys from STEP_USER_DATA_SCHEMA with values provided by the user.
     """
 
-    api = UnifiAccessHub(data["host"], data["verify_ssl"])
+    api = UnifiAccessHub(data["host"], data["verify_ssl"], data["use_polling"])
 
     auth_response = await hass.async_add_executor_job(
         api.authenticate, data["api_token"]

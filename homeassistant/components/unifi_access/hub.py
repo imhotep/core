@@ -3,6 +3,7 @@
 This module interacts with the Unifi Access API server.
 """
 import asyncio
+from datetime import timedelta
 import json
 import logging
 import ssl
@@ -43,8 +44,11 @@ class UnifiAccessHub:
     This class takes care of interacting with the Unifi Access API.
     """
 
-    def __init__(self, host: str, verify_ssl: bool = False) -> None:
+    def __init__(
+        self, host: str, verify_ssl: bool = False, use_polling: bool = False
+    ) -> None:
         """Initialize."""
+        self.use_polling = use_polling
         self.verify_ssl = verify_ssl
         if self.verify_ssl is False:
             _LOGGER.warning("SSL Verification disabled for %s", host)
@@ -86,7 +90,11 @@ class UnifiAccessHub:
 
     def update(self):
         """Get latest door data."""
-        _LOGGER.info("Getting door updates from Unifi Access %s", self.host)
+        _LOGGER.info(
+            "Getting door updates from Unifi Access %s Use Polling %s",
+            self.host,
+            self.use_polling,
+        )
         data = self._make_http_request(f"{self.host}{DOORS_URL}")
 
         for _i, door in enumerate(data):
@@ -96,7 +104,6 @@ class UnifiAccessHub:
                 existing_door.name = door["name"]
                 existing_door.door_position_status = door["door_position_status"]
                 existing_door.door_lock_relay_status = door["door_lock_relay_status"]
-                existing_door.publish_updates()
             elif door["is_bind_hub"] is True:
                 self._doors[door_id] = UnifiAccessDoor(
                     door_id=door["id"],
@@ -105,7 +112,7 @@ class UnifiAccessHub:
                     door_lock_relay_status=door["door_lock_relay_status"],
                     hub=self,
                 )
-        if self.update_t is None:
+        if self.update_t is None and self.use_polling is False:
             self.start_continuous_updates()
 
         return self._doors
@@ -123,7 +130,6 @@ class UnifiAccessHub:
             ]
             existing_door.door_position_status = updated_door["door_position_status"]
             existing_door.name = updated_door["name"]
-            existing_door.publish_updates()
             _LOGGER.info("Door %s updated", door_id)
 
     def authenticate(self, api_token: str) -> str:
@@ -272,11 +278,13 @@ class UnifiAccessCoordinator(DataUpdateCoordinator):
 
     def __init__(self, hass: HomeAssistant, hub) -> None:
         """Initialize Unifi Access Coordinator."""
+        update_interval = timedelta(seconds=3) if hub.use_polling is True else None
+
         super().__init__(
             hass,
             _LOGGER,
             name="Unifi Access Coordinator",
-            # update_interval=timedelta(seconds=3),
+            update_interval=update_interval,
         )
         self.hub = hub
 

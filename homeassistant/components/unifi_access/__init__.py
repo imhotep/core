@@ -13,7 +13,9 @@ PLATFORMS: list[Platform] = [Platform.BINARY_SENSOR, Platform.LOCK]
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Set up Unifi Access from a config entry."""
-    hub = UnifiAccessHub(entry.data["host"], entry.data["verify_ssl"])
+    hub = UnifiAccessHub(
+        entry.data["host"], entry.data["verify_ssl"], entry.data["use_polling"]
+    )
     hub.set_api_token(entry.data["api_token"])
     hass.data.setdefault(DOMAIN, {})[entry.entry_id] = hub
 

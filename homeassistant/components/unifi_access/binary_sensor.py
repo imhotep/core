@@ -33,7 +33,8 @@ async def async_setup_entry(
     binary_sensor_entities: list[UnifiDoorStatusEntity | UnifiDoorbellStatusEntity] = []
     for key in coordinator.data:
         binary_sensor_entities.append(UnifiDoorStatusEntity(coordinator, key))
-        binary_sensor_entities.append(UnifiDoorbellStatusEntity(coordinator, key))
+        if hub.use_polling is False:
+            binary_sensor_entities.append(UnifiDoorbellStatusEntity(coordinator, key))
     async_add_entities(binary_sensor_entities)
 
 
