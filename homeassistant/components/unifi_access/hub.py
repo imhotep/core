@@ -200,21 +200,33 @@ class UnifiAccessHub:
                     if door_id in self.doors:
                         existing_door = self.doors[door_id]
                         existing_door.door_position_status = update["data"]["status"]
-                        _LOGGER.info("DPS Change Updated")
+                        _LOGGER.info(
+                            "DPS Change of door %s with ID %s Updated",
+                            existing_door.name,
+                            door_id,
+                        )
                 case "access.data.device.remote_unlock":
                     door_id = update["data"]["unique_id"]
                     _LOGGER.info("Remote Unlock %s", door_id)
                     if door_id in self.doors:
                         existing_door = self.doors[door_id]
                         existing_door.door_lock_relay_status = "unlock"
-                        _LOGGER.info("Remote Unlock Updated")
+                        _LOGGER.info(
+                            "Remote Unlock of door %s with ID %s updated",
+                            existing_door.name,
+                            door_id,
+                        )
                 case "access.data.device.update":
                     door_id = update["data"]["door"]["unique_id"]
                     _LOGGER.info("Device Update via websocket %s", door_id)
                     if door_id in self.doors:
                         existing_door: UnifiAccessDoor = self.doors[door_id]
                         self.update_door(door_id)
-                        _LOGGER.info("Door %s updated", door_id)
+                        _LOGGER.info(
+                            "Door name %s with ID %s updated",
+                            existing_door.name,
+                            door_id,
+                        )
                 case "access.remote_view":
                     door_name = update["data"]["door_name"]
                     _LOGGER.info("Doorbell Press %s", door_name)
@@ -228,21 +240,33 @@ class UnifiAccessHub:
                     )
                     if existing_door is not None:
                         existing_door.doorbell_pressed = True
-                        _LOGGER.info("Doorbell Pressed Updated %s", door_id)
+                        existing_door.doorbell_request_id = update["data"]["request_id"]
+                        _LOGGER.info(
+                            "Doorbell press on %s Request ID %s",
+                            door_name,
+                            update["data"]["request_id"],
+                        )
                 case "access.remote_view.change":
-                    door_name = update["data"]["door_name"]
-                    _LOGGER.info("Doorbell Press Stopped %s", door_name)
+                    doorbell_request_id = update["data"]["remote_call_request_id"]
+                    _LOGGER.info(
+                        "Doorbell press stopped. Request ID %s", doorbell_request_id
+                    )
                     existing_door: UnifiAccessDoor = next(
                         (
                             door
                             for door in self.doors.values()
-                            if door.name == door_name
+                            if door.doorbell_request_id == doorbell_request_id
                         ),
                         None,
                     )
                     if existing_door is not None:
                         existing_door.doorbell_pressed = False
-                        _LOGGER.info("Doorbell Press Stopped Updated %s", door_id)
+                        existing_door.doorbell_request_id = None
+                        _LOGGER.info(
+                            "Doorbell press stopped on %s Request ID %s",
+                            existing_door.name,
+                            doorbell_request_id,
+                        )
 
             if existing_door is not None:
                 existing_door.publish_updates()
