@@ -87,8 +87,6 @@ class UnifiAccessHub:
     def update(self):
         """Get latest door data."""
         _LOGGER.info("Getting door updates from Unifi Access %s", self.host)
-        if self.update_t is None:
-            self.start_updates()
         data = self._make_http_request(f"{self.host}{DOORS_URL}")
 
         for _i, door in enumerate(data):
@@ -107,12 +105,26 @@ class UnifiAccessHub:
                     door_lock_relay_status=door["door_lock_relay_status"],
                     hub=self,
                 )
+        if self.update_t is None:
+            self.start_continuous_updates()
+
         return self._doors
 
     def update_door(self, door_id: int) -> None:
         """Get latest door data for a specific door."""
         _LOGGER.info("Getting door update from Unifi Access with id %s", door_id)
-        self._make_http_request(f"{self.host}{DOORS_URL}/{door_id}")
+        updated_door = self._make_http_request(f"{self.host}{DOORS_URL}/{door_id}")
+        door_id = updated_door["id"]
+        _LOGGER.info("Got door update %s", updated_door)
+        if door_id in self.doors:
+            existing_door: UnifiAccessDoor = self.doors[door_id]
+            existing_door.door_lock_relay_status = updated_door[
+                "door_lock_relay_status"
+            ]
+            existing_door.door_position_status = updated_door["door_position_status"]
+            existing_door.name = updated_door["name"]
+            existing_door.publish_updates()
+            _LOGGER.info("Door %s updated", door_id)
 
     def authenticate(self, api_token: str) -> str:
         """Test if we can authenticate with the host."""
@@ -146,7 +158,7 @@ class UnifiAccessHub:
             f"{self.host}{DOOR_UNLOCK_URL}".format(door_id=door_id), "PUT"
         )
 
-    def _make_http_request(self, url, method="GET") -> None:
+    def _make_http_request(self, url, method="GET") -> dict:
         """Make HTTP request to Unifi Access API server."""
         r = request(
             method,
@@ -167,57 +179,73 @@ class UnifiAccessHub:
         return response["data"]
 
     def on_message(self, wsap, message):
-        """Handle messages received on the websocket client."""
+        """Handle messages received on the websocket client.
+
+        Doorbell presses are relying on door names so if those are not unique, it may cause some issues
+        """
         # _LOGGER.info(f"Got update {message}")
         if "Hello" not in message:
             update = json.loads(message)
+            existing_door: UnifiAccessDoor = None
             match update["event"]:
                 case "access.dps_change":
                     door_id = update["data"]["door_id"]
                     _LOGGER.info("DPS Change %s", door_id)
                     if door_id in self.doors:
-                        existing_door: UnifiAccessDoor = self.doors[door_id]
+                        existing_door = self.doors[door_id]
                         existing_door.door_position_status = update["data"]["status"]
-                        existing_door.publish_updates()
                         _LOGGER.info("DPS Change Updated")
                 case "access.data.device.remote_unlock":
                     door_id = update["data"]["unique_id"]
                     _LOGGER.info("Remote Unlock %s", door_id)
                     if door_id in self.doors:
-                        existing_door: UnifiAccessDoor = self.doors[door_id]
+                        existing_door = self.doors[door_id]
                         existing_door.door_lock_relay_status = "unlock"
-                        existing_door.publish_updates()
                         _LOGGER.info("Remote Unlock Updated")
                 case "access.data.device.update":
                     door_id = update["data"]["door"]["unique_id"]
-                    _LOGGER.info("Device Update %s", door_id)
+                    _LOGGER.info("Device Update via websocket %s", door_id)
                     if door_id in self.doors:
                         existing_door: UnifiAccessDoor = self.doors[door_id]
                         self.update_door(door_id)
-                        existing_door.publish_updates()
-                        _LOGGER.info("Device Updated")
+                        _LOGGER.info("Door %s updated", door_id)
                 case "access.remote_view":
-                    door_id = update["event_object_id"]
-                    _LOGGER.info("Doorbell Press %s", door_id)
-                    if door_id in self.doors:
-                        existing_door: UnifiAccessDoor = self.doors[door_id]
+                    door_name = update["data"]["door_name"]
+                    _LOGGER.info("Doorbell Press %s", door_name)
+                    existing_door: UnifiAccessDoor = next(
+                        (
+                            door
+                            for door in self.doors.values()
+                            if door.name == door_name
+                        ),
+                        None,
+                    )
+                    if existing_door is not None:
                         existing_door.doorbell_pressed = True
-                        existing_door.publish_updates()
-                        _LOGGER.info("Doorbell Pressed Updated")
+                        _LOGGER.info("Doorbell Pressed Updated %s", door_id)
                 case "access.remote_view.change":
-                    door_id = update["event_object_id"]
-                    _LOGGER.info("Doorbell Press Stopped %s", door_id)
-                    if door_id in self.doors:
-                        existing_door: UnifiAccessDoor = self.doors[door_id]
+                    door_name = update["data"]["door_name"]
+                    _LOGGER.info("Doorbell Press Stopped %s", door_name)
+                    existing_door: UnifiAccessDoor = next(
+                        (
+                            door
+                            for door in self.doors.values()
+                            if door.name == door_name
+                        ),
+                        None,
+                    )
+                    if existing_door is not None:
                         existing_door.doorbell_pressed = False
-                        existing_door.publish_updates()
-                        _LOGGER.info("Doorbell Press Stopped")
+                        _LOGGER.info("Doorbell Press Stopped Updated %s", door_id)
+
+            if existing_door is not None:
+                existing_door.publish_updates()
 
     def on_error(self, wsap, error):
         """Handle errors in the websocket client."""
         _LOGGER.error("Got error %s", error)
 
-    def start_updates(self):
+    def start_continuous_updates(self):
         """Start listening for updates in a separate thread using websocket-client."""
         self.update_t = Thread(target=self.listen_for_updates)
         self.update_t.daemon = True

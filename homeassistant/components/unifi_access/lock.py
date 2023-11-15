@@ -43,7 +43,7 @@ class UnifiDoorLockEntity(CoordinatorEntity, LockEntity):
     def __init__(self, coordinator, door_id) -> None:
         """Initialize Unifi Access Door Lock."""
         super().__init__(coordinator, context=id)
-        self.id = id
+        self.id = door_id
         self.door: UnifiAccessDoor = self.coordinator.data[door_id]
         self._attr_unique_id = self.door.id
         self._attr_name = self.door.name
@@ -51,7 +51,7 @@ class UnifiDoorLockEntity(CoordinatorEntity, LockEntity):
     @property
     def available(self) -> bool:
         """Gray out lock when it's unlocked."""
-        return self.coordinator.data[self.id].is_locked
+        return self.door.is_locked
 
     @property
     def device_info(self) -> DeviceInfo:
