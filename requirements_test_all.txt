@@ -1923,9 +1923,6 @@ renson-endura-delta==1.7.1
 # homeassistant.components.reolink
 reolink-aio==0.9.1
 
-# homeassistant.components.unifi_access
-requests==2.31.0
-
 # homeassistant.components.rflink
 rflink==0.0.66
 
@@ -2247,7 +2244,7 @@ webmin-xmlrpc==0.0.2
 webrtc-noise-gain==1.2.3
 
 # homeassistant.components.unifi_access
-websocket-client==1.6.4
+websocket-client==1.8.0
 
 # homeassistant.components.whirlpool
 whirlpool-sixth-sense==0.18.8

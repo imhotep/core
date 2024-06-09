@@ -1489,6 +1489,8 @@ build.json @home-assistant/supervisor
 /tests/components/ukraine_alarm/ @PaulAnnekov
 /homeassistant/components/unifi/ @Kane610
 /tests/components/unifi/ @Kane610
+/homeassistant/components/unifi_access/ @imhotep
+/tests/components/unifi_access/ @imhotep
 /homeassistant/components/unifi_direct/ @tofuSCHNITZEL
 /homeassistant/components/unifiled/ @florisvdk
 /homeassistant/components/upb/ @gwww
