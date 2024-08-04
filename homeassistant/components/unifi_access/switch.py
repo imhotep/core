@@ -39,6 +39,10 @@ async def async_setup_entry(
 class EvacuationSwitch(CoordinatorEntity, SwitchEntity):
     """Unifi Access Evacuation Switch."""
 
+    _attr_translation_key = "evacuation"
+    _attr_has_entity_name = True
+    should_poll = False
+
     def __init__(
         self,
         hass: HomeAssistant,
@@ -51,7 +55,6 @@ class EvacuationSwitch(CoordinatorEntity, SwitchEntity):
         self.hub = hub
         self._is_on = self.hub.evacuation
         self._attr_unique_id = "unifi_access_all_doors_evacuation"
-        self._attr_name = "Evacuation"
 
     @property
     def device_info(self) -> DeviceInfo:
@@ -84,6 +87,10 @@ class EvacuationSwitch(CoordinatorEntity, SwitchEntity):
 class LockdownSwitch(CoordinatorEntity, SwitchEntity):
     """Unifi Access Lockdown Switch."""
 
+    _attr_translation_key = "lockdown"
+    _attr_has_entity_name = True
+    should_poll = False
+
     def __init__(
         self,
         hass: HomeAssistant,
@@ -97,7 +104,6 @@ class LockdownSwitch(CoordinatorEntity, SwitchEntity):
         self.coordinator = coordinator
         self._attr_unique_id = "unifi_access_all_doors_lockdown"
         self._is_on = self.hub.lockdown
-        self._attr_name = "Lockdown"
 
     @property
     def device_info(self) -> DeviceInfo:

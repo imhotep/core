@@ -5,7 +5,8 @@
   "postCreateCommand": "script/setup",
   "postStartCommand": "script/bootstrap",
   "containerEnv": {
-    "PYTHONASYNCIODEBUG": "1"
+    "PYTHONASYNCIODEBUG": "1",
+    "TZ": "America/Los_Angeles"
   },
   "features": {
     "ghcr.io/devcontainers/features/github-cli:1": {}

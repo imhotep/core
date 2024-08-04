@@ -110,10 +110,11 @@ class UnifiAccessHub:
 
     def update(self):
         """Get latest door data."""
-        _LOGGER.info(
-            "Getting door updates from Unifi Access %s Use Polling %s",
+        _LOGGER.debug(
+            "Getting door updates from Unifi Access %s Use Polling %s. Doors? %s",
             self.host,
             self.use_polling,
+            self.doors,
         )
         data = self._make_http_request(f"{self.host}{DOORS_URL}")
 
