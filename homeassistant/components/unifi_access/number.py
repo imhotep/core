@@ -27,13 +27,13 @@ async def async_setup_entry(
     coordinator: UnifiAccessCoordinator = UnifiAccessCoordinator(hass, hub)
 
     await coordinator.async_config_entry_first_refresh()
-
-    async_add_entities(
-        [
-            TemporaryLockRuleIntervalNumberEntity(door)
-            for door in coordinator.data.values()
-        ]
-    )
+    if hub.supports_door_lock_rules:
+        async_add_entities(
+            [
+                TemporaryLockRuleIntervalNumberEntity(door)
+                for door in coordinator.data.values()
+            ]
+        )
 
 
 class TemporaryLockRuleIntervalNumberEntity(RestoreNumber):

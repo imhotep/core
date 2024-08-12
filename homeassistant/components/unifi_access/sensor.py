@@ -26,16 +26,17 @@ async def async_setup_entry(
 
     await coordinator.async_config_entry_first_refresh()
 
-    async_add_entities(
-        [
-            sensor_entity(door)
-            for door in coordinator.data.values()
-            for sensor_entity in (
-                TemporaryLockRuleSensorEntity,
-                TemporaryLockRuleEndTimeSensorEntity,
-            )
-        ]
-    )
+    if hub.supports_door_lock_rules:
+        async_add_entities(
+            [
+                sensor_entity(door)
+                for door in coordinator.data.values()
+                for sensor_entity in (
+                    TemporaryLockRuleSensorEntity,
+                    TemporaryLockRuleEndTimeSensorEntity,
+                )
+            ]
+        )
 
 
 class TemporaryLockRuleSensorEntity(SensorEntity):
