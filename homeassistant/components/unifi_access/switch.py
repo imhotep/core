@@ -1,5 +1,6 @@
 """Platform for switch integration."""
 
+import logging
 from typing import Any
 
 from homeassistant.components.switch import SwitchEntity
@@ -12,6 +13,8 @@ from homeassistant.helpers.update_coordinator import CoordinatorEntity
 from .const import DOMAIN
 from .coordinator import UnifiAccessEvacuationAndLockdownSwitchCoordinator
 from .hub import UnifiAccessHub
+
+_LOGGER = logging.getLogger(__name__)
 
 
 async def async_setup_entry(
@@ -66,6 +69,11 @@ class EvacuationSwitch(CoordinatorEntity, SwitchEntity):
             manufacturer="Unifi",
         )
 
+    @property
+    def is_on(self) -> bool:
+        """Get Unifi Access Evacuation Switch status."""
+        return self.hub.evacuation
+
     async def async_turn_off(self, **kwargs: Any) -> None:
         "Turn off Evacuation."
         await self.hass.async_add_executor_job(
@@ -79,9 +87,19 @@ class EvacuationSwitch(CoordinatorEntity, SwitchEntity):
         )
 
     def _handle_coordinator_update(self) -> None:
-        """Handle Unifi Access Door Lock updates from coordinator."""
+        """Handle Unifi Access Evacuation Switch updates from coordinator."""
         self._attr_is_on = self.hub.evacuation
         self.async_write_ha_state()
+
+    async def async_added_to_hass(self) -> None:
+        """Add Unifi Access Evacuation Switch to Home Assistant."""
+        await super().async_added_to_hass()
+        self.hub.register_callback(self.async_write_ha_state)
+
+    async def async_will_remove_from_hass(self) -> None:
+        """Remove Unifi Access Evacuation Switch from Home Assistant."""
+        await super().async_will_remove_from_hass()
+        self.hub.remove_callback(self.async_write_ha_state)
 
 
 class LockdownSwitch(CoordinatorEntity, SwitchEntity):
@@ -115,6 +133,11 @@ class LockdownSwitch(CoordinatorEntity, SwitchEntity):
             manufacturer="Unifi",
         )
 
+    @property
+    def is_on(self) -> bool:
+        """Get Unifi Access Lockdown Switch status."""
+        return self.hub.lockdown
+
     async def async_turn_off(self, **kwargs: Any) -> None:
         "Turn off Evacuation."
         await self.hass.async_add_executor_job(
@@ -128,6 +151,16 @@ class LockdownSwitch(CoordinatorEntity, SwitchEntity):
         )
 
     def _handle_coordinator_update(self) -> None:
-        """Handle Unifi Access Door Lock updates from coordinator."""
+        """Handle Unifi Access Lockdown Switch updates from coordinator."""
         self._attr_is_on = self.hub.lockdown
         self.async_write_ha_state()
+
+    async def async_added_to_hass(self) -> None:
+        """Add Unifi Access Lockdown Switch to Home Assistant."""
+        await super().async_added_to_hass()
+        self.hub.register_callback(self.async_write_ha_state)
+
+    async def async_will_remove_from_hass(self) -> None:
+        """Remove Unifi Access Lockdown Switch from Home Assistant."""
+        await super().async_will_remove_from_hass()
+        self.hub.remove_callback(self.async_write_ha_state)
