@@ -132,12 +132,14 @@ class HomeAssistantSnapshotSerializer(AmberDataSerializer):
         """Prepare a Home Assistant area registry entry for serialization."""
         serialized = AreaRegistryEntrySnapshot(dataclasses.asdict(data) | {"id": ANY})
         serialized.pop("_json_repr")
+        serialized.pop("_cache")
         return serialized
 
     @classmethod
     def _serializable_config_entry(cls, data: ConfigEntry) -> SerializableData:
         """Prepare a Home Assistant config entry for serialization."""
-        return ConfigEntrySnapshot(data.as_dict() | {"entry_id": ANY})
+        entry = ConfigEntrySnapshot(data.as_dict() | {"entry_id": ANY})
+        return cls._remove_created_and_modified_at(entry)
 
     @classmethod
     def _serializable_device_registry_entry(
@@ -155,7 +157,17 @@ class HomeAssistantSnapshotSerializer(AmberDataSerializer):
             serialized["via_device_id"] = ANY
         if serialized["primary_config_entry"] is not None:
             serialized["primary_config_entry"] = ANY
-        return serialized
+        serialized.pop("_cache")
+        return cls._remove_created_and_modified_at(serialized)
+
+    @classmethod
+    def _remove_created_and_modified_at(
+        cls, data: SerializableData
+    ) -> SerializableData:
+        """Remove created_at and modified_at from the data."""
+        data.pop("created_at", None)
+        data.pop("modified_at", None)
+        return data
 
     @classmethod
     def _serializable_entity_registry_entry(
@@ -172,7 +184,8 @@ class HomeAssistantSnapshotSerializer(AmberDataSerializer):
             }
         )
         serialized.pop("categories")
-        return serialized
+        serialized.pop("_cache")
+        return cls._remove_created_and_modified_at(serialized)
 
     @classmethod
     def _serializable_flow_result(cls, data: FlowResult) -> SerializableData:
@@ -184,7 +197,7 @@ class HomeAssistantSnapshotSerializer(AmberDataSerializer):
         cls, data: ir.IssueEntry
     ) -> SerializableData:
         """Prepare a Home Assistant issue registry entry for serialization."""
-        return IssueRegistryItemSnapshot(data.to_json() | {"created": ANY})
+        return IssueRegistryItemSnapshot(dataclasses.asdict(data) | {"created": ANY})
 
     @classmethod
     def _serializable_state(cls, data: State) -> SerializableData:

@@ -17,7 +17,7 @@
           "api_token": "[%key:common::config_flow::data::api_token%]"
         }
       },
-      "reconfigure_confirm": {
+      "reconfigure": {
         "description": "Please reconfigure with Mealie.",
         "data": {
           "host": "[%key:common::config_flow::data::url%]",
@@ -110,7 +110,7 @@
   "services": {
     "get_mealplan": {
       "name": "Get mealplan",
-      "description": "Get meaplan from Mealie",
+      "description": "Get mealplan from Mealie",
       "fields": {
         "config_entry_id": {
           "name": "Mealie instance",
@@ -173,6 +173,36 @@
         "entry_type": {
           "name": "Entry type",
           "description": "The type of dish to randomize."
+        }
+      }
+    },
+    "set_mealplan": {
+      "name": "Set a mealplan",
+      "description": "Set a mealplan for a specific date",
+      "fields": {
+        "config_entry_id": {
+          "name": "[%key:component::mealie::services::get_mealplan::fields::config_entry_id::name%]",
+          "description": "[%key:component::mealie::services::get_mealplan::fields::config_entry_id::description%]"
+        },
+        "date": {
+          "name": "[%key:component::mealie::services::set_random_mealplan::fields::date::name%]",
+          "description": "[%key:component::mealie::services::set_random_mealplan::fields::date::description%]"
+        },
+        "entry_type": {
+          "name": "[%key:component::mealie::services::set_random_mealplan::fields::entry_type::name%]",
+          "description": "The type of dish to set the recipe to."
+        },
+        "recipe_id": {
+          "name": "[%key:component::mealie::services::get_recipe::fields::recipe_id::name%]",
+          "description": "[%key:component::mealie::services::get_recipe::fields::recipe_id::description%]"
+        },
+        "note_title": {
+          "name": "Meal note title",
+          "description": "Meal note title for when planning without recipe."
+        },
+        "note_text": {
+          "name": "Note text",
+          "description": "Meal note text for when planning without recipe."
         }
       }
     }

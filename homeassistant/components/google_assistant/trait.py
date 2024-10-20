@@ -40,7 +40,7 @@ from homeassistant.components.cover import CoverEntityFeature
 from homeassistant.components.fan import FanEntityFeature
 from homeassistant.components.humidifier import HumidifierEntityFeature
 from homeassistant.components.light import LightEntityFeature
-from homeassistant.components.lock import STATE_JAMMED, STATE_UNLOCKING
+from homeassistant.components.lock import LockState
 from homeassistant.components.media_player import MediaPlayerEntityFeature, MediaType
 from homeassistant.components.vacuum import VacuumEntityFeature
 from homeassistant.components.valve import ValveEntityFeature
@@ -71,7 +71,6 @@ from homeassistant.const import (
     STATE_ALARM_PENDING,
     STATE_ALARM_TRIGGERED,
     STATE_IDLE,
-    STATE_LOCKED,
     STATE_OFF,
     STATE_ON,
     STATE_PAUSED,
@@ -81,7 +80,7 @@ from homeassistant.const import (
     STATE_UNKNOWN,
     UnitOfTemperature,
 )
-from homeassistant.core import DOMAIN as HA_DOMAIN, HomeAssistant
+from homeassistant.core import DOMAIN as HOMEASSISTANT_DOMAIN, HomeAssistant
 from homeassistant.helpers.network import get_url
 from homeassistant.util import color as color_util, dt as dt_util
 from homeassistant.util.dt import utcnow
@@ -110,61 +109,42 @@ from .error import ChallengeNeeded, SmartHomeError
 _LOGGER = logging.getLogger(__name__)
 
 PREFIX_TRAITS = "action.devices.traits."
-TRAIT_CAMERA_STREAM = f"{PREFIX_TRAITS}CameraStream"
-TRAIT_ONOFF = f"{PREFIX_TRAITS}OnOff"
-TRAIT_DOCK = f"{PREFIX_TRAITS}Dock"
-TRAIT_STARTSTOP = f"{PREFIX_TRAITS}StartStop"
+TRAIT_ARM_DISARM = f"{PREFIX_TRAITS}ArmDisarm"
 TRAIT_BRIGHTNESS = f"{PREFIX_TRAITS}Brightness"
-TRAIT_COLOR_SETTING = f"{PREFIX_TRAITS}ColorSetting"
-TRAIT_SCENE = f"{PREFIX_TRAITS}Scene"
-TRAIT_TEMPERATURE_SETTING = f"{PREFIX_TRAITS}TemperatureSetting"
-TRAIT_TEMPERATURE_CONTROL = f"{PREFIX_TRAITS}TemperatureControl"
-TRAIT_LOCKUNLOCK = f"{PREFIX_TRAITS}LockUnlock"
-TRAIT_FANSPEED = f"{PREFIX_TRAITS}FanSpeed"
-TRAIT_MODES = f"{PREFIX_TRAITS}Modes"
-TRAIT_INPUTSELECTOR = f"{PREFIX_TRAITS}InputSelector"
-TRAIT_OBJECTDETECTION = f"{PREFIX_TRAITS}ObjectDetection"
-TRAIT_OPENCLOSE = f"{PREFIX_TRAITS}OpenClose"
-TRAIT_VOLUME = f"{PREFIX_TRAITS}Volume"
-TRAIT_ARMDISARM = f"{PREFIX_TRAITS}ArmDisarm"
-TRAIT_HUMIDITY_SETTING = f"{PREFIX_TRAITS}HumiditySetting"
-TRAIT_TRANSPORT_CONTROL = f"{PREFIX_TRAITS}TransportControl"
-TRAIT_MEDIA_STATE = f"{PREFIX_TRAITS}MediaState"
+TRAIT_CAMERA_STREAM = f"{PREFIX_TRAITS}CameraStream"
 TRAIT_CHANNEL = f"{PREFIX_TRAITS}Channel"
+TRAIT_COLOR_SETTING = f"{PREFIX_TRAITS}ColorSetting"
+TRAIT_DOCK = f"{PREFIX_TRAITS}Dock"
+TRAIT_ENERGY_STORAGE = f"{PREFIX_TRAITS}EnergyStorage"
+TRAIT_FAN_SPEED = f"{PREFIX_TRAITS}FanSpeed"
+TRAIT_HUMIDITY_SETTING = f"{PREFIX_TRAITS}HumiditySetting"
+TRAIT_INPUT_SELECTOR = f"{PREFIX_TRAITS}InputSelector"
 TRAIT_LOCATOR = f"{PREFIX_TRAITS}Locator"
-TRAIT_ENERGYSTORAGE = f"{PREFIX_TRAITS}EnergyStorage"
+TRAIT_LOCK_UNLOCK = f"{PREFIX_TRAITS}LockUnlock"
+TRAIT_MEDIA_STATE = f"{PREFIX_TRAITS}MediaState"
+TRAIT_MODES = f"{PREFIX_TRAITS}Modes"
+TRAIT_OBJECT_DETECTION = f"{PREFIX_TRAITS}ObjectDetection"
+TRAIT_ON_OFF = f"{PREFIX_TRAITS}OnOff"
+TRAIT_OPEN_CLOSE = f"{PREFIX_TRAITS}OpenClose"
+TRAIT_SCENE = f"{PREFIX_TRAITS}Scene"
 TRAIT_SENSOR_STATE = f"{PREFIX_TRAITS}SensorState"
+TRAIT_START_STOP = f"{PREFIX_TRAITS}StartStop"
+TRAIT_TEMPERATURE_CONTROL = f"{PREFIX_TRAITS}TemperatureControl"
+TRAIT_TEMPERATURE_SETTING = f"{PREFIX_TRAITS}TemperatureSetting"
+TRAIT_TRANSPORT_CONTROL = f"{PREFIX_TRAITS}TransportControl"
+TRAIT_VOLUME = f"{PREFIX_TRAITS}Volume"
 
 PREFIX_COMMANDS = "action.devices.commands."
-COMMAND_ONOFF = f"{PREFIX_COMMANDS}OnOff"
-COMMAND_GET_CAMERA_STREAM = f"{PREFIX_COMMANDS}GetCameraStream"
-COMMAND_DOCK = f"{PREFIX_COMMANDS}Dock"
-COMMAND_STARTSTOP = f"{PREFIX_COMMANDS}StartStop"
-COMMAND_PAUSEUNPAUSE = f"{PREFIX_COMMANDS}PauseUnpause"
-COMMAND_BRIGHTNESS_ABSOLUTE = f"{PREFIX_COMMANDS}BrightnessAbsolute"
-COMMAND_COLOR_ABSOLUTE = f"{PREFIX_COMMANDS}ColorAbsolute"
 COMMAND_ACTIVATE_SCENE = f"{PREFIX_COMMANDS}ActivateScene"
-COMMAND_SET_TEMPERATURE = f"{PREFIX_COMMANDS}SetTemperature"
-COMMAND_THERMOSTAT_TEMPERATURE_SETPOINT = (
-    f"{PREFIX_COMMANDS}ThermostatTemperatureSetpoint"
-)
-COMMAND_THERMOSTAT_TEMPERATURE_SET_RANGE = (
-    f"{PREFIX_COMMANDS}ThermostatTemperatureSetRange"
-)
-COMMAND_THERMOSTAT_SET_MODE = f"{PREFIX_COMMANDS}ThermostatSetMode"
-COMMAND_LOCKUNLOCK = f"{PREFIX_COMMANDS}LockUnlock"
-COMMAND_FANSPEED = f"{PREFIX_COMMANDS}SetFanSpeed"
-COMMAND_FANSPEEDRELATIVE = f"{PREFIX_COMMANDS}SetFanSpeedRelative"
-COMMAND_MODES = f"{PREFIX_COMMANDS}SetModes"
-COMMAND_INPUT = f"{PREFIX_COMMANDS}SetInput"
+COMMAND_ARM_DISARM = f"{PREFIX_COMMANDS}ArmDisarm"
+COMMAND_BRIGHTNESS_ABSOLUTE = f"{PREFIX_COMMANDS}BrightnessAbsolute"
+COMMAND_CHARGE = f"{PREFIX_COMMANDS}Charge"
+COMMAND_COLOR_ABSOLUTE = f"{PREFIX_COMMANDS}ColorAbsolute"
+COMMAND_DOCK = f"{PREFIX_COMMANDS}Dock"
+COMMAND_GET_CAMERA_STREAM = f"{PREFIX_COMMANDS}GetCameraStream"
+COMMAND_LOCK_UNLOCK = f"{PREFIX_COMMANDS}LockUnlock"
+COMMAND_LOCATE = f"{PREFIX_COMMANDS}Locate"
 COMMAND_NEXT_INPUT = f"{PREFIX_COMMANDS}NextInput"
-COMMAND_PREVIOUS_INPUT = f"{PREFIX_COMMANDS}PreviousInput"
-COMMAND_OPENCLOSE = f"{PREFIX_COMMANDS}OpenClose"
-COMMAND_OPENCLOSE_RELATIVE = f"{PREFIX_COMMANDS}OpenCloseRelative"
-COMMAND_SET_VOLUME = f"{PREFIX_COMMANDS}setVolume"
-COMMAND_VOLUME_RELATIVE = f"{PREFIX_COMMANDS}volumeRelative"
-COMMAND_MUTE = f"{PREFIX_COMMANDS}mute"
-COMMAND_ARMDISARM = f"{PREFIX_COMMANDS}ArmDisarm"
 COMMAND_MEDIA_NEXT = f"{PREFIX_COMMANDS}mediaNext"
 COMMAND_MEDIA_PAUSE = f"{PREFIX_COMMANDS}mediaPause"
 COMMAND_MEDIA_PREVIOUS = f"{PREFIX_COMMANDS}mediaPrevious"
@@ -173,11 +153,30 @@ COMMAND_MEDIA_SEEK_RELATIVE = f"{PREFIX_COMMANDS}mediaSeekRelative"
 COMMAND_MEDIA_SEEK_TO_POSITION = f"{PREFIX_COMMANDS}mediaSeekToPosition"
 COMMAND_MEDIA_SHUFFLE = f"{PREFIX_COMMANDS}mediaShuffle"
 COMMAND_MEDIA_STOP = f"{PREFIX_COMMANDS}mediaStop"
+COMMAND_MUTE = f"{PREFIX_COMMANDS}mute"
+COMMAND_OPEN_CLOSE = f"{PREFIX_COMMANDS}OpenClose"
+COMMAND_ON_OFF = f"{PREFIX_COMMANDS}OnOff"
+COMMAND_OPEN_CLOSE_RELATIVE = f"{PREFIX_COMMANDS}OpenCloseRelative"
+COMMAND_PAUSE_UNPAUSE = f"{PREFIX_COMMANDS}PauseUnpause"
 COMMAND_REVERSE = f"{PREFIX_COMMANDS}Reverse"
-COMMAND_SET_HUMIDITY = f"{PREFIX_COMMANDS}SetHumidity"
+COMMAND_PREVIOUS_INPUT = f"{PREFIX_COMMANDS}PreviousInput"
 COMMAND_SELECT_CHANNEL = f"{PREFIX_COMMANDS}selectChannel"
-COMMAND_LOCATE = f"{PREFIX_COMMANDS}Locate"
-COMMAND_CHARGE = f"{PREFIX_COMMANDS}Charge"
+COMMAND_SET_TEMPERATURE = f"{PREFIX_COMMANDS}SetTemperature"
+COMMAND_SET_FAN_SPEED = f"{PREFIX_COMMANDS}SetFanSpeed"
+COMMAND_SET_FAN_SPEED_RELATIVE = f"{PREFIX_COMMANDS}SetFanSpeedRelative"
+COMMAND_SET_HUMIDITY = f"{PREFIX_COMMANDS}SetHumidity"
+COMMAND_SET_INPUT = f"{PREFIX_COMMANDS}SetInput"
+COMMAND_SET_MODES = f"{PREFIX_COMMANDS}SetModes"
+COMMAND_SET_VOLUME = f"{PREFIX_COMMANDS}setVolume"
+COMMAND_START_STOP = f"{PREFIX_COMMANDS}StartStop"
+COMMAND_THERMOSTAT_SET_MODE = f"{PREFIX_COMMANDS}ThermostatSetMode"
+COMMAND_THERMOSTAT_TEMPERATURE_SETPOINT = (
+    f"{PREFIX_COMMANDS}ThermostatTemperatureSetpoint"
+)
+COMMAND_THERMOSTAT_TEMPERATURE_SET_RANGE = (
+    f"{PREFIX_COMMANDS}ThermostatTemperatureSetRange"
+)
+COMMAND_VOLUME_RELATIVE = f"{PREFIX_COMMANDS}volumeRelative"
 
 TRAITS: list[type[_Trait]] = []
 
@@ -294,7 +293,7 @@ class _Trait(ABC):
         self.state = state
         self.config = config
 
-    def sync_attributes(self):
+    def sync_attributes(self) -> dict[str, Any]:
         """Return attributes for a sync request."""
         raise NotImplementedError
 
@@ -302,7 +301,7 @@ class _Trait(ABC):
         """Add options for the sync request."""
         return {}
 
-    def query_attributes(self):
+    def query_attributes(self) -> dict[str, Any]:
         """Return the attributes of this trait for this entity."""
         raise NotImplementedError
 
@@ -337,11 +336,11 @@ class BrightnessTrait(_Trait):
 
         return False
 
-    def sync_attributes(self):
+    def sync_attributes(self) -> dict[str, Any]:
         """Return brightness attributes for a sync request."""
         return {}
 
-    def query_attributes(self):
+    def query_attributes(self) -> dict[str, Any]:
         """Return brightness query attributes."""
         domain = self.state.domain
         response = {}
@@ -388,7 +387,7 @@ class CameraStreamTrait(_Trait):
 
         return False
 
-    def sync_attributes(self):
+    def sync_attributes(self) -> dict[str, Any]:
         """Return stream attributes for a sync request."""
         return {
             "cameraStreamSupportedProtocols": ["hls"],
@@ -396,7 +395,7 @@ class CameraStreamTrait(_Trait):
             "cameraStreamNeedDrmEncryption": False,
         }
 
-    def query_attributes(self):
+    def query_attributes(self) -> dict[str, Any]:
         """Return camera stream attributes."""
         return self.stream_info or {}
 
@@ -416,7 +415,7 @@ class ObjectDetection(_Trait):
     https://developers.google.com/actions/smarthome/traits/objectdetection
     """
 
-    name = TRAIT_OBJECTDETECTION
+    name = TRAIT_OBJECT_DETECTION
     commands = []
 
     @staticmethod
@@ -426,7 +425,7 @@ class ObjectDetection(_Trait):
             domain == event.DOMAIN and device_class == event.EventDeviceClass.DOORBELL
         )
 
-    def sync_attributes(self):
+    def sync_attributes(self) -> dict[str, Any]:
         """Return ObjectDetection attributes for a sync request."""
         return {}
 
@@ -434,7 +433,7 @@ class ObjectDetection(_Trait):
         """Add options for the sync request."""
         return {"notificationSupportedByAgent": True}
 
-    def query_attributes(self):
+    def query_attributes(self) -> dict[str, Any]:
         """Return ObjectDetection query attributes."""
         return {}
 
@@ -474,8 +473,8 @@ class OnOffTrait(_Trait):
     https://developers.google.com/actions/smarthome/traits/onoff
     """
 
-    name = TRAIT_ONOFF
-    commands = [COMMAND_ONOFF]
+    name = TRAIT_ON_OFF
+    commands = [COMMAND_ON_OFF]
 
     @staticmethod
     def supported(domain, features, device_class, _):
@@ -498,20 +497,20 @@ class OnOffTrait(_Trait):
             humidifier.DOMAIN,
         )
 
-    def sync_attributes(self):
+    def sync_attributes(self) -> dict[str, Any]:
         """Return OnOff attributes for a sync request."""
         if self.state.attributes.get(ATTR_ASSUMED_STATE, False):
             return {"commandOnlyOnOff": True}
         return {}
 
-    def query_attributes(self):
+    def query_attributes(self) -> dict[str, Any]:
         """Return OnOff query attributes."""
         return {"on": self.state.state not in (STATE_OFF, STATE_UNKNOWN)}
 
     async def execute(self, command, data, params, challenge):
         """Execute an OnOff command."""
         if (domain := self.state.domain) == group.DOMAIN:
-            service_domain = HA_DOMAIN
+            service_domain = HOMEASSISTANT_DOMAIN
             service = SERVICE_TURN_ON if params["on"] else SERVICE_TURN_OFF
 
         else:
@@ -548,11 +547,11 @@ class ColorSettingTrait(_Trait):
             color_modes
         )
 
-    def sync_attributes(self):
+    def sync_attributes(self) -> dict[str, Any]:
         """Return color temperature attributes for a sync request."""
         attrs = self.state.attributes
         color_modes = attrs.get(light.ATTR_SUPPORTED_COLOR_MODES)
-        response = {}
+        response: dict[str, Any] = {}
 
         if light.color_supported(color_modes):
             response["colorModel"] = "hsv"
@@ -571,11 +570,11 @@ class ColorSettingTrait(_Trait):
 
         return response
 
-    def query_attributes(self):
+    def query_attributes(self) -> dict[str, Any]:
         """Return color temperature query attributes."""
         color_mode = self.state.attributes.get(light.ATTR_COLOR_MODE)
 
-        color = {}
+        color: dict[str, Any] = {}
 
         if light.color_supported([color_mode]):
             color_hs = self.state.attributes.get(light.ATTR_HS_COLOR)
@@ -684,12 +683,12 @@ class SceneTrait(_Trait):
             script.DOMAIN,
         )
 
-    def sync_attributes(self):
+    def sync_attributes(self) -> dict[str, Any]:
         """Return scene attributes for a sync request."""
         # None of the supported domains can support sceneReversible
         return {}
 
-    def query_attributes(self):
+    def query_attributes(self) -> dict[str, Any]:
         """Return scene query attributes."""
         return {}
 
@@ -728,11 +727,11 @@ class DockTrait(_Trait):
         """Test if state is supported."""
         return domain == vacuum.DOMAIN
 
-    def sync_attributes(self):
+    def sync_attributes(self) -> dict[str, Any]:
         """Return dock attributes for a sync request."""
         return {}
 
-    def query_attributes(self):
+    def query_attributes(self) -> dict[str, Any]:
         """Return dock query attributes."""
         return {"isDocked": self.state.state == vacuum.STATE_DOCKED}
 
@@ -762,11 +761,11 @@ class LocatorTrait(_Trait):
         """Test if state is supported."""
         return domain == vacuum.DOMAIN and features & VacuumEntityFeature.LOCATE
 
-    def sync_attributes(self):
+    def sync_attributes(self) -> dict[str, Any]:
         """Return locator attributes for a sync request."""
         return {}
 
-    def query_attributes(self):
+    def query_attributes(self) -> dict[str, Any]:
         """Return locator query attributes."""
         return {}
 
@@ -794,7 +793,7 @@ class EnergyStorageTrait(_Trait):
     https://developers.google.com/actions/smarthome/traits/energystorage
     """
 
-    name = TRAIT_ENERGYSTORAGE
+    name = TRAIT_ENERGY_STORAGE
     commands = [COMMAND_CHARGE]
 
     @staticmethod
@@ -802,14 +801,14 @@ class EnergyStorageTrait(_Trait):
         """Test if state is supported."""
         return domain == vacuum.DOMAIN and features & VacuumEntityFeature.BATTERY
 
-    def sync_attributes(self):
+    def sync_attributes(self) -> dict[str, Any]:
         """Return EnergyStorage attributes for a sync request."""
         return {
             "isRechargeable": True,
             "queryOnlyEnergyStorage": True,
         }
 
-    def query_attributes(self):
+    def query_attributes(self) -> dict[str, Any]:
         """Return EnergyStorage query attributes."""
         battery_level = self.state.attributes.get(ATTR_BATTERY_LEVEL)
         if battery_level is None:
@@ -849,8 +848,8 @@ class StartStopTrait(_Trait):
     https://developers.google.com/actions/smarthome/traits/startstop
     """
 
-    name = TRAIT_STARTSTOP
-    commands = [COMMAND_STARTSTOP, COMMAND_PAUSEUNPAUSE]
+    name = TRAIT_START_STOP
+    commands = [COMMAND_START_STOP, COMMAND_PAUSE_UNPAUSE]
 
     @staticmethod
     def supported(domain, features, device_class, _):
@@ -866,7 +865,7 @@ class StartStopTrait(_Trait):
 
         return False
 
-    def sync_attributes(self):
+    def sync_attributes(self) -> dict[str, Any]:
         """Return StartStop attributes for a sync request."""
         domain = self.state.domain
         if domain == vacuum.DOMAIN:
@@ -878,7 +877,9 @@ class StartStopTrait(_Trait):
         if domain in COVER_VALVE_DOMAINS:
             return {}
 
-    def query_attributes(self):
+        raise NotImplementedError(f"Unsupported domain {domain}")
+
+    def query_attributes(self) -> dict[str, Any]:
         """Return StartStop query attributes."""
         domain = self.state.domain
         state = self.state.state
@@ -898,17 +899,21 @@ class StartStopTrait(_Trait):
                 )
             }
 
+        raise NotImplementedError(f"Unsupported domain {domain}")
+
     async def execute(self, command, data, params, challenge):
         """Execute a StartStop command."""
         domain = self.state.domain
         if domain == vacuum.DOMAIN:
-            return await self._execute_vacuum(command, data, params, challenge)
+            await self._execute_vacuum(command, data, params, challenge)
+            return
         if domain in COVER_VALVE_DOMAINS:
-            return await self._execute_cover_or_valve(command, data, params, challenge)
+            await self._execute_cover_or_valve(command, data, params, challenge)
+            return
 
     async def _execute_vacuum(self, command, data, params, challenge):
         """Execute a StartStop command."""
-        if command == COMMAND_STARTSTOP:
+        if command == COMMAND_START_STOP:
             if params["start"]:
                 await self.hass.services.async_call(
                     self.state.domain,
@@ -925,7 +930,7 @@ class StartStopTrait(_Trait):
                     blocking=not self.config.should_report_state,
                     context=data.context,
                 )
-        elif command == COMMAND_PAUSEUNPAUSE:
+        elif command == COMMAND_PAUSE_UNPAUSE:
             if params["pause"]:
                 await self.hass.services.async_call(
                     self.state.domain,
@@ -946,7 +951,7 @@ class StartStopTrait(_Trait):
     async def _execute_cover_or_valve(self, command, data, params, challenge):
         """Execute a StartStop command."""
         domain = self.state.domain
-        if command == COMMAND_STARTSTOP:
+        if command == COMMAND_START_STOP:
             if params["start"] is False:
                 if self.state.state in (
                     COVER_VALVE_STATES[domain]["closing"],
@@ -1006,7 +1011,7 @@ class TemperatureControlTrait(_Trait):
             and device_class == sensor.SensorDeviceClass.TEMPERATURE
         )
 
-    def sync_attributes(self):
+    def sync_attributes(self) -> dict[str, Any]:
         """Return temperature attributes for a sync request."""
         response = {}
         domain = self.state.domain
@@ -1042,7 +1047,7 @@ class TemperatureControlTrait(_Trait):
 
         return response
 
-    def query_attributes(self):
+    def query_attributes(self) -> dict[str, Any]:
         """Return temperature states."""
         response = {}
         domain = self.state.domain
@@ -1168,7 +1173,7 @@ class TemperatureSettingTrait(_Trait):
 
         return modes
 
-    def sync_attributes(self):
+    def sync_attributes(self) -> dict[str, Any]:
         """Return temperature point and modes attributes for a sync request."""
         response = {}
         attrs = self.state.attributes
@@ -1211,9 +1216,9 @@ class TemperatureSettingTrait(_Trait):
 
         return response
 
-    def query_attributes(self):
+    def query_attributes(self) -> dict[str, Any]:
         """Return temperature point and modes query attributes."""
-        response = {}
+        response: dict[str, Any] = {}
         attrs = self.state.attributes
         unit = self.hass.config.units.temperature_unit
 
@@ -1426,9 +1431,9 @@ class HumiditySettingTrait(_Trait):
             and device_class == sensor.SensorDeviceClass.HUMIDITY
         )
 
-    def sync_attributes(self):
+    def sync_attributes(self) -> dict[str, Any]:
         """Return humidity attributes for a sync request."""
-        response = {}
+        response: dict[str, Any] = {}
         attrs = self.state.attributes
         domain = self.state.domain
 
@@ -1449,7 +1454,7 @@ class HumiditySettingTrait(_Trait):
 
         return response
 
-    def query_attributes(self):
+    def query_attributes(self) -> dict[str, Any]:
         """Return humidity query attributes."""
         response = {}
         attrs = self.state.attributes
@@ -1458,9 +1463,9 @@ class HumiditySettingTrait(_Trait):
         if domain == sensor.DOMAIN:
             device_class = attrs.get(ATTR_DEVICE_CLASS)
             if device_class == sensor.SensorDeviceClass.HUMIDITY:
-                current_humidity = self.state.state
-                if current_humidity not in (STATE_UNKNOWN, STATE_UNAVAILABLE):
-                    response["humidityAmbientPercent"] = round(float(current_humidity))
+                humidity_state = self.state.state
+                if humidity_state not in (STATE_UNKNOWN, STATE_UNAVAILABLE):
+                    response["humidityAmbientPercent"] = round(float(humidity_state))
 
         elif domain == humidifier.DOMAIN:
             target_humidity: int | None = attrs.get(humidifier.ATTR_HUMIDITY)
@@ -1499,8 +1504,8 @@ class LockUnlockTrait(_Trait):
     https://developers.google.com/actions/smarthome/traits/lockunlock
     """
 
-    name = TRAIT_LOCKUNLOCK
-    commands = [COMMAND_LOCKUNLOCK]
+    name = TRAIT_LOCK_UNLOCK
+    commands = [COMMAND_LOCK_UNLOCK]
 
     @staticmethod
     def supported(domain, features, device_class, _):
@@ -1512,17 +1517,17 @@ class LockUnlockTrait(_Trait):
         """Return if the trait might ask for 2FA."""
         return True
 
-    def sync_attributes(self):
+    def sync_attributes(self) -> dict[str, Any]:
         """Return LockUnlock attributes for a sync request."""
         return {}
 
-    def query_attributes(self):
+    def query_attributes(self) -> dict[str, Any]:
         """Return LockUnlock query attributes."""
-        if self.state.state == STATE_JAMMED:
+        if self.state.state == LockState.JAMMED:
             return {"isJammed": True}
 
         # If its unlocking its not yet unlocked so we consider is locked
-        return {"isLocked": self.state.state in (STATE_UNLOCKING, STATE_LOCKED)}
+        return {"isLocked": self.state.state in (LockState.UNLOCKING, LockState.LOCKED)}
 
     async def execute(self, command, data, params, challenge):
         """Execute an LockUnlock command."""
@@ -1548,8 +1553,8 @@ class ArmDisArmTrait(_Trait):
     https://developers.google.com/actions/smarthome/traits/armdisarm
     """
 
-    name = TRAIT_ARMDISARM
-    commands = [COMMAND_ARMDISARM]
+    name = TRAIT_ARM_DISARM
+    commands = [COMMAND_ARM_DISARM]
 
     state_to_service = {
         STATE_ALARM_ARMED_HOME: SERVICE_ALARM_ARM_HOME,
@@ -1598,7 +1603,7 @@ class ArmDisArmTrait(_Trait):
 
         return states[0]
 
-    def sync_attributes(self):
+    def sync_attributes(self) -> dict[str, Any]:
         """Return ArmDisarm attributes for a sync request."""
         response = {}
         levels = []
@@ -1618,7 +1623,7 @@ class ArmDisArmTrait(_Trait):
         response["availableArmLevels"] = {"levels": levels, "ordered": True}
         return response
 
-    def query_attributes(self):
+    def query_attributes(self) -> dict[str, Any]:
         """Return ArmDisarm query attributes."""
         armed_state = self.state.attributes.get("next_state", self.state.state)
 
@@ -1689,8 +1694,8 @@ class FanSpeedTrait(_Trait):
     https://developers.google.com/actions/smarthome/traits/fanspeed
     """
 
-    name = TRAIT_FANSPEED
-    commands = [COMMAND_FANSPEED, COMMAND_REVERSE]
+    name = TRAIT_FAN_SPEED
+    commands = [COMMAND_SET_FAN_SPEED, COMMAND_REVERSE]
 
     def __init__(self, hass, state, config):
         """Initialize a trait for a state."""
@@ -1715,11 +1720,11 @@ class FanSpeedTrait(_Trait):
             return features & ClimateEntityFeature.FAN_MODE
         return False
 
-    def sync_attributes(self):
+    def sync_attributes(self) -> dict[str, Any]:
         """Return speed point and modes attributes for a sync request."""
         domain = self.state.domain
         speeds = []
-        result = {}
+        result: dict[str, Any] = {}
 
         if domain == fan.DOMAIN:
             reversible = bool(
@@ -1764,7 +1769,7 @@ class FanSpeedTrait(_Trait):
 
         return result
 
-    def query_attributes(self):
+    def query_attributes(self) -> dict[str, Any]:
         """Return speed point and modes query attributes."""
 
         attrs = self.state.attributes
@@ -1835,7 +1840,7 @@ class FanSpeedTrait(_Trait):
 
     async def execute(self, command, data, params, challenge):
         """Execute a smart home command."""
-        if command == COMMAND_FANSPEED:
+        if command == COMMAND_SET_FAN_SPEED:
             await self.execute_fanspeed(data, params)
         elif command == COMMAND_REVERSE:
             await self.execute_reverse(data, params)
@@ -1849,7 +1854,7 @@ class ModesTrait(_Trait):
     """
 
     name = TRAIT_MODES
-    commands = [COMMAND_MODES]
+    commands = [COMMAND_SET_MODES]
 
     SYNONYMS = {
         "preset mode": ["preset mode", "mode", "preset"],
@@ -1910,7 +1915,7 @@ class ModesTrait(_Trait):
             )
         return mode
 
-    def sync_attributes(self):
+    def sync_attributes(self) -> dict[str, Any]:
         """Return mode attributes for a sync request."""
         modes = []
 
@@ -1934,10 +1939,10 @@ class ModesTrait(_Trait):
 
         return {"availableModes": modes}
 
-    def query_attributes(self):
+    def query_attributes(self) -> dict[str, Any]:
         """Return current modes."""
         attrs = self.state.attributes
-        response = {}
+        response: dict[str, Any] = {}
         mode_settings = {}
 
         if self.state.domain == fan.DOMAIN:
@@ -2083,8 +2088,8 @@ class InputSelectorTrait(_Trait):
     https://developers.google.com/assistant/smarthome/traits/inputselector
     """
 
-    name = TRAIT_INPUTSELECTOR
-    commands = [COMMAND_INPUT, COMMAND_NEXT_INPUT, COMMAND_PREVIOUS_INPUT]
+    name = TRAIT_INPUT_SELECTOR
+    commands = [COMMAND_SET_INPUT, COMMAND_NEXT_INPUT, COMMAND_PREVIOUS_INPUT]
 
     SYNONYMS: dict[str, list[str]] = {}
 
@@ -2098,7 +2103,7 @@ class InputSelectorTrait(_Trait):
 
         return False
 
-    def sync_attributes(self):
+    def sync_attributes(self) -> dict[str, Any]:
         """Return mode attributes for a sync request."""
         attrs = self.state.attributes
         sourcelist: list[str] = attrs.get(media_player.ATTR_INPUT_SOURCE_LIST) or []
@@ -2109,7 +2114,7 @@ class InputSelectorTrait(_Trait):
 
         return {"availableInputs": inputs, "orderedInputs": True}
 
-    def query_attributes(self):
+    def query_attributes(self) -> dict[str, Any]:
         """Return current modes."""
         attrs = self.state.attributes
         return {"currentInput": attrs.get(media_player.ATTR_INPUT_SOURCE, "")}
@@ -2119,7 +2124,7 @@ class InputSelectorTrait(_Trait):
         sources = self.state.attributes.get(media_player.ATTR_INPUT_SOURCE_LIST) or []
         source = self.state.attributes.get(media_player.ATTR_INPUT_SOURCE)
 
-        if command == COMMAND_INPUT:
+        if command == COMMAND_SET_INPUT:
             requested_source = params.get("newInput")
         elif command == COMMAND_NEXT_INPUT:
             requested_source = _next_selected(sources, source)
@@ -2157,8 +2162,8 @@ class OpenCloseTrait(_Trait):
         cover.CoverDeviceClass.GATE,
     )
 
-    name = TRAIT_OPENCLOSE
-    commands = [COMMAND_OPENCLOSE, COMMAND_OPENCLOSE_RELATIVE]
+    name = TRAIT_OPEN_CLOSE
+    commands = [COMMAND_OPEN_CLOSE, COMMAND_OPEN_CLOSE_RELATIVE]
 
     @staticmethod
     def supported(domain, features, device_class, _):
@@ -2179,7 +2184,7 @@ class OpenCloseTrait(_Trait):
         """Return if the trait might ask for 2FA."""
         return domain == cover.DOMAIN and device_class in OpenCloseTrait.COVER_2FA
 
-    def sync_attributes(self):
+    def sync_attributes(self) -> dict[str, Any]:
         """Return opening direction."""
         response = {}
         features = self.state.attributes.get(ATTR_SUPPORTED_FEATURES, 0)
@@ -2215,10 +2220,10 @@ class OpenCloseTrait(_Trait):
 
         return response
 
-    def query_attributes(self):
+    def query_attributes(self) -> dict[str, Any]:
         """Return state query attributes."""
         domain = self.state.domain
-        response = {}
+        response: dict[str, Any] = {}
 
         # When it's an assumed state, we will return empty state
         # This shouldn't happen because we set `commandOnlyOpenClose`
@@ -2258,7 +2263,7 @@ class OpenCloseTrait(_Trait):
         if domain in COVER_VALVE_DOMAINS:
             svc_params = {ATTR_ENTITY_ID: self.state.entity_id}
             should_verify = False
-            if command == COMMAND_OPENCLOSE_RELATIVE:
+            if command == COMMAND_OPEN_CLOSE_RELATIVE:
                 position = self.state.attributes.get(
                     COVER_VALVE_CURRENT_POSITION[domain]
                 )
@@ -2324,7 +2329,7 @@ class VolumeTrait(_Trait):
 
         return False
 
-    def sync_attributes(self):
+    def sync_attributes(self) -> dict[str, Any]:
         """Return volume attributes for a sync request."""
         features = self.state.attributes.get(ATTR_SUPPORTED_FEATURES, 0)
         return {
@@ -2341,7 +2346,7 @@ class VolumeTrait(_Trait):
             "levelStepSize": 10,
         }
 
-    def query_attributes(self):
+    def query_attributes(self) -> dict[str, Any]:
         """Return volume query attributes."""
         response = {}
 
@@ -2504,7 +2509,7 @@ class TransportControlTrait(_Trait):
 
         return False
 
-    def sync_attributes(self):
+    def sync_attributes(self) -> dict[str, Any]:
         """Return opening direction."""
         response = {}
 
@@ -2519,7 +2524,7 @@ class TransportControlTrait(_Trait):
 
         return response
 
-    def query_attributes(self):
+    def query_attributes(self) -> dict[str, Any]:
         """Return the attributes of this trait for this entity."""
         return {}
 
@@ -2618,11 +2623,11 @@ class MediaStateTrait(_Trait):
         """Test if state is supported."""
         return domain == media_player.DOMAIN
 
-    def sync_attributes(self):
+    def sync_attributes(self) -> dict[str, Any]:
         """Return attributes for a sync request."""
         return {"supportActivityState": True, "supportPlaybackState": True}
 
-    def query_attributes(self):
+    def query_attributes(self) -> dict[str, Any]:
         """Return the attributes of this trait for this entity."""
         return {
             "activityState": self.activity_lookup.get(self.state.state, "INACTIVE"),
@@ -2652,11 +2657,11 @@ class ChannelTrait(_Trait):
 
         return False
 
-    def sync_attributes(self):
+    def sync_attributes(self) -> dict[str, Any]:
         """Return attributes for a sync request."""
         return {"availableChannels": [], "commandOnlyChannels": True}
 
-    def query_attributes(self):
+    def query_attributes(self) -> dict[str, Any]:
         """Return channel query attributes."""
         return {}
 
@@ -2729,7 +2734,7 @@ class SensorStateTrait(_Trait):
         """Test if state is supported."""
         return domain == sensor.DOMAIN and device_class in cls.sensor_types
 
-    def sync_attributes(self):
+    def sync_attributes(self) -> dict[str, Any]:
         """Return attributes for a sync request."""
         device_class = self.state.attributes.get(ATTR_DEVICE_CLASS)
         data = self.sensor_types.get(device_class)
@@ -2757,7 +2762,7 @@ class SensorStateTrait(_Trait):
 
         return {"sensorStatesSupported": [sensor_state]}
 
-    def query_attributes(self):
+    def query_attributes(self) -> dict[str, Any]:
         """Return the attributes of this trait for this entity."""
         device_class = self.state.attributes.get(ATTR_DEVICE_CLASS)
         data = self.sensor_types.get(device_class)

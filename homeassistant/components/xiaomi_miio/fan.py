@@ -71,6 +71,7 @@ from .const import (
     MODEL_AIRPURIFIER_2H,
     MODEL_AIRPURIFIER_2S,
     MODEL_AIRPURIFIER_3C,
+    MODEL_AIRPURIFIER_3C_REV_A,
     MODEL_AIRPURIFIER_4,
     MODEL_AIRPURIFIER_4_LITE_RMA1,
     MODEL_AIRPURIFIER_4_LITE_RMB1,
@@ -91,15 +92,15 @@ from .const import (
     SERVICE_RESET_FILTER,
     SERVICE_SET_EXTRA_FEATURES,
 )
-from .device import XiaomiCoordinatedMiioEntity
+from .entity import XiaomiCoordinatedMiioEntity
 from .typing import ServiceMethodDetails
 
 _LOGGER = logging.getLogger(__name__)
 
 DATA_KEY = "fan.xiaomi_miio"
 
-ATTR_MODE_NATURE = "Nature"
-ATTR_MODE_NORMAL = "Normal"
+ATTR_MODE_NATURE = "nature"
+ATTR_MODE_NORMAL = "normal"
 
 # Air Purifier
 ATTR_BRIGHTNESS = "brightness"
@@ -215,7 +216,7 @@ async def async_setup_entry(
     coordinator = hass.data[DOMAIN][config_entry.entry_id][KEY_COORDINATOR]
     device = hass.data[DOMAIN][config_entry.entry_id][KEY_DEVICE]
 
-    if model == MODEL_AIRPURIFIER_3C:
+    if model in (MODEL_AIRPURIFIER_3C, MODEL_AIRPURIFIER_3C_REV_A):
         entity = XiaomiAirPurifierMB4(
             device,
             config_entry,
@@ -844,6 +845,8 @@ class XiaomiAirFreshT2017(XiaomiAirFreshA1):
 
 class XiaomiGenericFan(XiaomiGenericDevice):
     """Representation of a generic Xiaomi Fan."""
+
+    _attr_translation_key = "generic_fan"
 
     def __init__(self, device, entry, unique_id, coordinator):
         """Initialize the fan."""
