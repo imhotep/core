@@ -4,6 +4,8 @@
   "codeowners": ["@simonjgreen"],
   "config_flow": true,
   "documentation": "https://www.home-assistant.io/integrations/sagecoffee",
+  "integration_type": "device",
   "iot_class": "cloud_push",
+  "quality_scale": "internal",
   "requirements": ["sagecoffee==0.1.0"]
 }

@@ -1,0 +1,56 @@
+# Quality scale rules for the Sage Coffee integration
+rules:
+  # Bronze (mandatory)
+  brands:
+    status: todo
+  common-modules:
+    status: todo
+  config-flow: done
+  config-flow-test-coverage:
+    status: todo
+  dependency-transparency:
+    status: done
+  docs-actions:
+    status: exempt
+    comment: Integration does not register custom actions.
+  docs-high-level-description:
+    status: todo
+  docs-installation-instructions:
+    status: todo
+  docs-removal-instructions:
+    status: todo
+  entity-event-setup:
+    status: todo
+  entity-unique-id: done
+  has-entity-name:
+    status: todo
+  runtime-data: done
+  test-before-configure:
+    status: todo
+  test-before-setup:
+    status: todo
+  unique-config-entry:
+    status: todo
+  action-setup:
+    status: exempt
+    comment: Integration does not register custom actions.
+
+  # Silver
+  entity-unavailable:
+    status: todo
+  parallel-updates:
+    status: todo
+  appropriate-polling:
+    status: exempt
+    comment: Integration uses WebSocket push for updates, no polling.
+
+  # Gold
+  devices: done
+  diagnostics:
+    status: todo
+  entity-translations:
+    status: todo
+
+  # Platinum
+  strict-typing:
+    status: todo
