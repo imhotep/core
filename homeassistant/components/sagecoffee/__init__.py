@@ -15,7 +15,7 @@ from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import ConfigEntryAuthFailed, ConfigEntryNotReady
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator
 
-from .const import CONF_REFRESH_TOKEN, DOMAIN, PLATFORMS
+from .const import CONF_MACHINE_TYPE, CONF_REFRESH_TOKEN, DOMAIN, PLATFORMS
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -155,6 +155,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: SageCoffeeConfigEntry) -
         client = SageCoffeeClient(
             client_id=DEFAULT_CLIENT_ID,
             refresh_token=refresh_token,
+            app=entry.data.get(CONF_MACHINE_TYPE),
         )
         await client.__aenter__()
 
