@@ -1,0 +1,8 @@
+{
+  "domain": "sagecoffee",
+  "name": "Sage Coffee",
+  "codeowners": ["@simonjgreen"],
+  "config_flow": true,
+  "iot_class": "cloud_push",
+  "requirements": ["sagecoffee==0.1.0"]
+}
