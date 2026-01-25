@@ -1,9 +1,11 @@
 """Config flow for Sage Coffee integration."""
+
 from __future__ import annotations
 
 import logging
 from typing import Any
 
+from sagecoffee.auth import DEFAULT_CLIENT_ID, AuthClient
 import voluptuous as vol
 
 from homeassistant.config_entries import ConfigFlow, ConfigFlowResult
@@ -13,8 +15,6 @@ from homeassistant.helpers.selector import (
     TextSelectorConfig,
     TextSelectorType,
 )
-
-from sagecoffee.auth import AuthClient, DEFAULT_CLIENT_ID
 
 from .const import CONF_REFRESH_TOKEN, DOMAIN
 

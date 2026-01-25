@@ -1,18 +1,19 @@
 """The Sage Coffee integration."""
+
 from __future__ import annotations
 
 import asyncio
 import logging
 from typing import Any
 
+from sagecoffee import SageCoffeeClient
+from sagecoffee.auth import DEFAULT_CLIENT_ID
+
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import CONF_PASSWORD, CONF_USERNAME, Platform
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import ConfigEntryAuthFailed, ConfigEntryNotReady
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator
-
-from sagecoffee import SageCoffeeClient
-from sagecoffee.auth import DEFAULT_CLIENT_ID
 
 from .const import CONF_REFRESH_TOKEN, DOMAIN, PLATFORMS
 
@@ -57,12 +58,30 @@ class SageCoffeeCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                 for b in (state.boiler_temps or [])
             ],
             "grind_size": state.grind_size,
-            "theme": state.raw_data.get("reported", {}).get("cfg", {}).get("default", {}).get("theme"),
-            "brightness": state.raw_data.get("reported", {}).get("cfg", {}).get("default", {}).get("brightness"),
-            "work_light_brightness": state.raw_data.get("reported", {}).get("cfg", {}).get("default", {}).get("work_light_brightness"),
-            "volume": state.raw_data.get("reported", {}).get("cfg", {}).get("default", {}).get("vol"),
-            "idle_time": state.raw_data.get("reported", {}).get("cfg", {}).get("default", {}).get("idle_time"),
-            "timezone": state.raw_data.get("reported", {}).get("cfg", {}).get("default", {}).get("timezone"),
+            "theme": state.raw_data.get("reported", {})
+            .get("cfg", {})
+            .get("default", {})
+            .get("theme"),
+            "brightness": state.raw_data.get("reported", {})
+            .get("cfg", {})
+            .get("default", {})
+            .get("brightness"),
+            "work_light_brightness": state.raw_data.get("reported", {})
+            .get("cfg", {})
+            .get("default", {})
+            .get("work_light_brightness"),
+            "volume": state.raw_data.get("reported", {})
+            .get("cfg", {})
+            .get("default", {})
+            .get("vol"),
+            "idle_time": state.raw_data.get("reported", {})
+            .get("cfg", {})
+            .get("default", {})
+            .get("idle_time"),
+            "timezone": state.raw_data.get("reported", {})
+            .get("cfg", {})
+            .get("default", {})
+            .get("timezone"),
             "firmware": state.raw_data.get("reported", {}).get("firmware", {}),
             "raw": state.raw_data,
         }
@@ -76,7 +95,9 @@ class SageCoffeeCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                 state = await self.client.get_last_state(serial)
                 if state:
                     self._update_state_from_device(state)
-                    _LOGGER.debug("Got initial state for %s: %s", serial, state.reported_state)
+                    _LOGGER.debug(
+                        "Got initial state for %s: %s", serial, state.reported_state
+                    )
             except Exception as err:
                 _LOGGER.warning("Failed to get initial state for %s: %s", serial, err)
 
