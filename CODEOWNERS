@@ -1406,6 +1406,7 @@ build.json @home-assistant/supervisor
 /homeassistant/components/ruuvitag_ble/ @akx
 /tests/components/ruuvitag_ble/ @akx
 /homeassistant/components/rympro/ @OnFreund @elad-bar @maorcc
+/homeassistant/components/sageha/ @imhotep
 /tests/components/rympro/ @OnFreund @elad-bar @maorcc
 /homeassistant/components/sabnzbd/ @shaiu @jpbede
 /tests/components/sabnzbd/ @shaiu @jpbede

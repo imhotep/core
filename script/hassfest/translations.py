@@ -44,6 +44,7 @@ ALLOW_NAME_TRANSLATION = {
     "nmap_tracker",
     "remote_calendar",
     "rpi_power",
+    "sagecoffee",
     "swiss_public_transport",
     "waze_travel_time",
     "zodiac",
