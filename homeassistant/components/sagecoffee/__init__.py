@@ -83,7 +83,6 @@ class SageCoffeeCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             .get("default", {})
             .get("timezone"),
             "firmware": state.raw_data.get("reported", {}).get("firmware", {}),
-            "raw": state.raw_data,
         }
 
     async def async_start_websocket(self) -> None:
@@ -138,6 +137,9 @@ class SageCoffeeCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             except asyncio.CancelledError:
                 pass
             self._ws_task = None
+        # Clear stored states and appliances to prevent memory leaks
+        self._states.clear()
+        self.appliances.clear()
 
     def get_state(self, serial: str) -> dict[str, Any] | None:
         """Get the current state for an appliance."""
