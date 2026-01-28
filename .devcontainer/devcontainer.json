@@ -2,8 +2,11 @@
   "name": "Home Assistant Dev",
   "context": "..",
   "dockerFile": "../Dockerfile.dev",
-  "postCreateCommand": "git config --global --add safe.directory ${containerWorkspaceFolder} && script/setup",
+  "postCreateCommand": "git config --global --add safe.directory ${containerWorkspaceFolder} && script/setup && pip install -e /workspaces/sagecoffee",
   "postStartCommand": "script/bootstrap",
+  "mounts": [
+    "source=/Users/anis/Documents/Projects/sagecoffee,target=/workspaces/sagecoffee,type=bind"
+  ],
   "containerEnv": {
     "PYTHONASYNCIODEBUG": "1",
     "TZ": "America/Los_Angeles"

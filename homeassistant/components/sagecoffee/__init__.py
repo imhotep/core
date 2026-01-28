@@ -10,10 +10,12 @@ from sagecoffee import SageCoffeeClient
 from sagecoffee.auth import DEFAULT_CLIENT_ID
 
 from homeassistant.config_entries import ConfigEntry
-from homeassistant.const import CONF_PASSWORD, CONF_USERNAME, Platform
+from homeassistant.const import CONF_PASSWORD, CONF_USERNAME
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import ConfigEntryAuthFailed, ConfigEntryNotReady
+from homeassistant.helpers import httpx_client
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator
+from homeassistant.util import ssl as ssl_util
 
 from .const import CONF_MACHINE_TYPE, CONF_REFRESH_TOKEN, DOMAIN, PLATFORMS
 
@@ -30,6 +32,7 @@ class SageCoffeeCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         hass: HomeAssistant,
         client: SageCoffeeClient,
         appliances: list[dict[str, Any]],
+        config_entry: ConfigEntry,
     ) -> None:
         """Initialize the coordinator."""
         super().__init__(
@@ -37,6 +40,7 @@ class SageCoffeeCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             _LOGGER,
             name=DOMAIN,
             update_interval=None,  # We use WebSocket push, not polling
+            config_entry=config_entry,
         )
         self.client = client
         self.appliances = appliances
@@ -87,11 +91,11 @@ class SageCoffeeCoordinator(DataUpdateCoordinator[dict[str, Any]]):
 
     async def async_start_websocket(self) -> None:
         """Start the WebSocket listener task."""
-        # Fetch initial state for all appliances
+        # Fetch initial state for all appliances (get_last_state is NOT async)
         for appliance in self.appliances:
             serial = appliance.serial_number
             try:
-                state = await self.client.get_last_state(serial)
+                state = self.client.get_last_state(serial)
                 if state:
                     self._update_state_from_device(state)
                     _LOGGER.debug(
@@ -105,7 +109,7 @@ class SageCoffeeCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             self.async_set_updated_data(self._states)
 
         if self._ws_task is None or self._ws_task.done():
-            self._ws_task = self.hass.async_create_task(
+            self._ws_task = self.hass.async_create_background_task(
                 self._websocket_listener(),
                 name="sagecoffee_websocket",
             )
@@ -154,10 +158,17 @@ async def async_setup_entry(hass: HomeAssistant, entry: SageCoffeeConfigEntry) -
         raise ConfigEntryAuthFailed("No refresh token available")
 
     try:
+        # Get Home Assistant's pre-configured httpx client and SSL context
+        # These are created in the executor to avoid blocking the event loop
+        http_client = httpx_client.get_async_client(hass)
+        ssl_context = ssl_util.client_context()
+
         client = SageCoffeeClient(
             client_id=DEFAULT_CLIENT_ID,
             refresh_token=refresh_token,
             app=entry.data.get(CONF_MACHINE_TYPE),
+            httpx_client=http_client,
+            ssl_context=ssl_context,
         )
         await client.__aenter__()
 
@@ -173,7 +184,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: SageCoffeeConfigEntry) -
         raise ConfigEntryNotReady from err
 
     # Create coordinator
-    coordinator = SageCoffeeCoordinator(hass, client, appliances)
+    coordinator = SageCoffeeCoordinator(hass, client, appliances, entry)
 
     # Store coordinator in entry runtime data
     entry.runtime_data = coordinator
