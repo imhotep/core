@@ -1,26 +1,18 @@
-# Actions for Sage Coffee integration
-
 set_wake_schedule:
   name: Set wake schedule
   description: Set an automatic wake schedule for the appliance.
   fields:
-    config_entry_id:
-      name: Config entry ID
-      description: Target integration config entry ID
-      example: 1234567890abcdef
-      required: true
-      selector:
-        text:
     serial:
-      name: Appliance serial (optional)
-      description: Target a specific appliance when multiple are present
+      name: Appliance serial
+      description: The serial number of the target appliance
       example: A1BUAESA252503225
-      required: false
+      required: true
       selector:
         text:
     hours:
       name: Hour (0-23)
       description: 24-hour clock hour when the appliance should wake
+      example: 7
       required: true
       selector:
         number:
@@ -30,6 +22,7 @@ set_wake_schedule:
     minutes:
       name: Minute (0-59)
       description: Minute when the appliance should wake
+      example: 30
       required: true
       selector:
         number:
@@ -65,17 +58,10 @@ disable_wake_schedule:
   name: Disable wake schedule
   description: Disable the automatic wake schedule for the appliance.
   fields:
-    config_entry_id:
-      name: Config entry ID
-      description: Target integration config entry ID
-      example: 1234567890abcdef
-      required: true
-      selector:
-        text:
     serial:
-      name: Appliance serial (optional)
-      description: Target a specific appliance when multiple are present
+      name: Appliance serial
+      description: The serial number of the target appliance
       example: A1BUAESA252503225
-      required: false
+      required: true
       selector:
         text:

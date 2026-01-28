@@ -9,17 +9,51 @@ from typing import Any
 from sagecoffee import SageCoffeeClient
 from sagecoffee.auth import DEFAULT_CLIENT_ID
 
-from homeassistant.config_entries import ConfigEntry
+from homeassistant.config_entries import ConfigEntry, ConfigEntryState
 from homeassistant.const import CONF_PASSWORD, CONF_USERNAME
-from homeassistant.core import HomeAssistant
-from homeassistant.exceptions import ConfigEntryAuthFailed, ConfigEntryNotReady
-from homeassistant.helpers import httpx_client
+from homeassistant.core import HomeAssistant, ServiceCall, ServiceResponse
+from homeassistant.exceptions import (
+    ConfigEntryAuthFailed,
+    ConfigEntryNotReady,
+    HomeAssistantError,
+    ServiceValidationError,
+)
+from homeassistant.helpers import config_validation as cv, httpx_client
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator
 from homeassistant.util import ssl as ssl_util
+import voluptuous as vol
 
 from .const import CONF_MACHINE_TYPE, CONF_REFRESH_TOKEN, DOMAIN, PLATFORMS
 
 _LOGGER = logging.getLogger(__name__)
+
+SERVICE_SET_WAKE_SCHEDULE = "set_wake_schedule"
+SERVICE_DISABLE_WAKE_SCHEDULE = "disable_wake_schedule"
+
+ATTR_CONFIG_ENTRY_ID = "config_entry_id"
+ATTR_SERIAL = "serial"
+ATTR_HOURS = "hours"
+ATTR_MINUTES = "minutes"
+ATTR_DAYS = "days"
+ATTR_ENABLED = "enabled"
+
+SET_WAKE_SCHEDULE_SCHEMA = vol.Schema(
+    {
+        vol.Required(ATTR_SERIAL): cv.string,
+        vol.Required(ATTR_HOURS): vol.Range(min=0, max=23),
+        vol.Required(ATTR_MINUTES): vol.Range(min=0, max=59),
+        vol.Optional(ATTR_DAYS): vol.All(
+            [vol.In(["mon", "tue", "wed", "thu", "fri", "sat", "sun"])]
+        ),
+        vol.Optional(ATTR_ENABLED, default=True): cv.boolean,
+    }
+)
+
+DISABLE_WAKE_SCHEDULE_SCHEMA = vol.Schema(
+    {
+        vol.Required(ATTR_SERIAL): cv.string,
+    }
+)
 
 type SageCoffeeConfigEntry = ConfigEntry[SageCoffeeCoordinator]
 
@@ -148,6 +182,93 @@ class SageCoffeeCoordinator(DataUpdateCoordinator[dict[str, Any]]):
     def get_state(self, serial: str) -> dict[str, Any] | None:
         """Get the current state for an appliance."""
         return self._states.get(serial)
+
+
+async def async_setup(hass: HomeAssistant, config: dict[str, Any]) -> bool:
+    """Set up the Sage Coffee integration."""
+    async def set_wake_schedule(call: ServiceCall) -> ServiceResponse:
+        """Set wake schedule for an appliance."""
+        serial = call.data.get(ATTR_SERIAL)
+        hours = call.data.get(ATTR_HOURS)
+        minutes = call.data.get(ATTR_MINUTES)
+        days = call.data.get(ATTR_DAYS)
+        enabled = call.data.get(ATTR_ENABLED, True)
+
+        # Find the config entry with this appliance
+        entry: SageCoffeeConfigEntry | None = None
+        for config_entry in hass.config_entries.async_entries(DOMAIN):
+            if config_entry.state is not ConfigEntryState.LOADED:
+                continue
+            coordinator: SageCoffeeCoordinator = config_entry.runtime_data
+            if any(a.serial_number == serial for a in coordinator.appliances):
+                entry = config_entry
+                break
+
+        if not entry:
+            raise ServiceValidationError(f"Appliance {serial} not found")
+
+        coordinator = entry.runtime_data
+
+        try:
+            # Convert days list to the format expected by the API (comma-separated string)
+            days_str = ",".join(days) if days else None
+
+            # Call the API to set wake schedule
+            await coordinator.client.set_wake_schedule(
+                serial=serial,
+                hours=hours,
+                minutes=minutes,
+                days=days_str,
+                enabled=enabled,
+            )
+        except Exception as err:
+            raise HomeAssistantError(f"Failed to set wake schedule: {err}") from err
+
+        return None
+
+    async def disable_wake_schedule(call: ServiceCall) -> ServiceResponse:
+        """Disable wake schedule for an appliance."""
+        serial = call.data.get(ATTR_SERIAL)
+
+        # Find the config entry with this appliance
+        entry: SageCoffeeConfigEntry | None = None
+        for config_entry in hass.config_entries.async_entries(DOMAIN):
+            if config_entry.state is not ConfigEntryState.LOADED:
+                continue
+            coordinator: SageCoffeeCoordinator = config_entry.runtime_data
+            if any(a.serial_number == serial for a in coordinator.appliances):
+                entry = config_entry
+                break
+
+        if not entry:
+            raise ServiceValidationError(f"Appliance {serial} not found")
+
+        coordinator = entry.runtime_data
+
+        try:
+            # Call the API to disable wake schedule
+            await coordinator.client.disable_wake_schedule(serial=serial)
+        except Exception as err:
+            raise HomeAssistantError(f"Failed to disable wake schedule: {err}") from err
+
+        return None
+
+    # Register services
+    hass.services.async_register(
+        DOMAIN,
+        SERVICE_SET_WAKE_SCHEDULE,
+        set_wake_schedule,
+        schema=SET_WAKE_SCHEDULE_SCHEMA,
+    )
+
+    hass.services.async_register(
+        DOMAIN,
+        SERVICE_DISABLE_WAKE_SCHEDULE,
+        disable_wake_schedule,
+        schema=DISABLE_WAKE_SCHEDULE_SCHEMA,
+    )
+
+    return True
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: SageCoffeeConfigEntry) -> bool:
