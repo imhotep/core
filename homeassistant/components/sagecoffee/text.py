@@ -6,13 +6,13 @@ import logging
 from typing import Any
 
 from homeassistant.components.text import TextEntity
-from homeassistant.core import HomeAssistant, callback
+from homeassistant.core import HomeAssistant
 from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from . import SageCoffeeConfigEntry, SageCoffeeCoordinator
-from .const import DOMAIN, STATE_ASLEEP
+from .const import DOMAIN
 
 _LOGGER = logging.getLogger(__name__)
 

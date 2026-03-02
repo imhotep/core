@@ -8,6 +8,7 @@ from typing import Any
 
 from sagecoffee import SageCoffeeClient
 from sagecoffee.auth import DEFAULT_CLIENT_ID
+import voluptuous as vol
 
 from homeassistant.config_entries import ConfigEntry, ConfigEntryState
 from homeassistant.const import CONF_PASSWORD, CONF_USERNAME
@@ -21,7 +22,6 @@ from homeassistant.exceptions import (
 from homeassistant.helpers import config_validation as cv, httpx_client
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator
 from homeassistant.util import ssl as ssl_util
-import voluptuous as vol
 
 from .const import CONF_BRAND, CONF_REFRESH_TOKEN, DOMAIN, PLATFORMS
 
@@ -172,7 +172,9 @@ class SageCoffeeCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             try:
                 await self.client.close()
             except Exception as err:
-                _LOGGER.debug("Error while closing client after websocket listener exit: %s", err)
+                _LOGGER.debug(
+                    "Error while closing client after websocket listener exit: %s", err
+                )
 
     async def async_stop_websocket(self) -> None:
         """Stop the WebSocket listener task."""
@@ -194,6 +196,7 @@ class SageCoffeeCoordinator(DataUpdateCoordinator[dict[str, Any]]):
 
 async def async_setup(hass: HomeAssistant, config: dict[str, Any]) -> bool:
     """Set up the Sage Coffee integration."""
+
     async def set_wake_schedule(call: ServiceCall) -> ServiceResponse:
         """Set wake schedule for an appliance."""
         serial = call.data.get(ATTR_SERIAL)
@@ -221,8 +224,13 @@ async def async_setup(hass: HomeAssistant, config: dict[str, Any]) -> bool:
             # Build cron expression: "minute hour * * days-of-week"
             # API expects numeric days: 1=Mon, 2=Tue, ..., 7=Sun
             day_to_num = {
-                "mon": "1", "tue": "2", "wed": "3", "thu": "4",
-                "fri": "5", "sat": "6", "sun": "7",
+                "mon": "1",
+                "tue": "2",
+                "wed": "3",
+                "thu": "4",
+                "fri": "5",
+                "sat": "6",
+                "sun": "7",
             }
             if days:
                 days_of_week = ",".join(day_to_num[d] for d in days)

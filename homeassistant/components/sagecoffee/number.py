@@ -7,11 +7,8 @@ from dataclasses import dataclass
 import logging
 from typing import Any
 
-from homeassistant.components.number import (
-    NumberEntity,
-    NumberEntityDescription,
-)
-from homeassistant.core import HomeAssistant, callback
+from homeassistant.components.number import NumberEntity, NumberEntityDescription
+from homeassistant.core import HomeAssistant
 from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
@@ -49,8 +46,8 @@ NUMBER_DESCRIPTIONS: tuple[SageCoffeeNumberEntityDescription, ...] = (
         native_max_value=100,
         native_step=10,
         value_fn=lambda state: state.get("work_light_brightness"),
-        set_fn=lambda coordinator, serial, value: coordinator.client.set_work_light_brightness(
-            int(value), serial
+        set_fn=lambda coordinator, serial, value: (
+            coordinator.client.set_work_light_brightness(int(value), serial)
         ),
     ),
     SageCoffeeNumberEntityDescription(
@@ -140,7 +137,5 @@ class SageCoffeeNumber(CoordinatorEntity[SageCoffeeCoordinator], NumberEntity):
                 self.coordinator.async_set_updated_data(self.coordinator.data)
             self.async_write_ha_state()
         except Exception as err:
-            _LOGGER.error(
-                "Failed to set %s: %s", self.entity_description.key, err
-            )
+            _LOGGER.error("Failed to set %s: %s", self.entity_description.key, err)
             raise

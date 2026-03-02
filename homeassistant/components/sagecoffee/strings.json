@@ -41,11 +41,11 @@
       "display_brightness": {
         "name": "Display Brightness"
       },
-      "work_light_brightness": {
-        "name": "Work Light Brightness"
-      },
       "volume_level": {
         "name": "Volume"
+      },
+      "work_light_brightness": {
+        "name": "Work Light Brightness"
       }
     },
     "select": {
