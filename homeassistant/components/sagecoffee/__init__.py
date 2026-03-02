@@ -23,7 +23,7 @@ from homeassistant.helpers.update_coordinator import DataUpdateCoordinator
 from homeassistant.util import ssl as ssl_util
 import voluptuous as vol
 
-from .const import CONF_MACHINE_TYPE, CONF_REFRESH_TOKEN, DOMAIN, PLATFORMS
+from .const import CONF_BRAND, CONF_REFRESH_TOKEN, DOMAIN, PLATFORMS
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -42,9 +42,9 @@ SET_WAKE_SCHEDULE_SCHEMA = vol.Schema(
         vol.Required(ATTR_SERIAL): cv.string,
         vol.Required(ATTR_HOURS): vol.Range(min=0, max=23),
         vol.Required(ATTR_MINUTES): vol.Range(min=0, max=59),
-        vol.Optional(ATTR_DAYS): vol.All(
-            [vol.In(["mon", "tue", "wed", "thu", "fri", "sat", "sun"])]
-        ),
+        vol.Optional(ATTR_DAYS): [
+            vol.In(["mon", "tue", "wed", "thu", "fri", "sat", "sun"])
+        ],
         vol.Optional(ATTR_ENABLED, default=True): cv.boolean,
     }
 )
@@ -125,11 +125,13 @@ class SageCoffeeCoordinator(DataUpdateCoordinator[dict[str, Any]]):
 
     async def async_start_websocket(self) -> None:
         """Start the WebSocket listener task."""
-        # Fetch initial state for all appliances (get_last_state is NOT async)
+        # Fetch initial state for all appliances (get_last_state is sync, run in executor)
         for appliance in self.appliances:
             serial = appliance.serial_number
             try:
-                state = self.client.get_last_state(serial)
+                state = await self.hass.async_add_executor_job(
+                    self.client.get_last_state, serial
+                )
                 if state:
                     self._update_state_from_device(state)
                     _LOGGER.debug(
@@ -165,6 +167,12 @@ class SageCoffeeCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             raise
         except Exception as err:
             _LOGGER.exception("WebSocket error: %s", err)
+        finally:
+            # Ensure the underlying stream is closed if the listener exits unexpectedly.
+            try:
+                await self.client.close()
+            except Exception as err:
+                _LOGGER.debug("Error while closing client after websocket listener exit: %s", err)
 
     async def async_stop_websocket(self) -> None:
         """Stop the WebSocket listener task."""
@@ -210,16 +218,22 @@ async def async_setup(hass: HomeAssistant, config: dict[str, Any]) -> bool:
         coordinator = entry.runtime_data
 
         try:
-            # Convert days list to the format expected by the API (comma-separated string)
-            days_str = ",".join(days) if days else None
+            # Build cron expression: "minute hour * * days-of-week"
+            # API expects numeric days: 1=Mon, 2=Tue, ..., 7=Sun
+            day_to_num = {
+                "mon": "1", "tue": "2", "wed": "3", "thu": "4",
+                "fri": "5", "sat": "6", "sun": "7",
+            }
+            if days:
+                days_of_week = ",".join(day_to_num[d] for d in days)
+            else:
+                days_of_week = "*"
+            cron = f"{minutes} {hours} * * {days_of_week}"
 
-            # Call the API to set wake schedule
             await coordinator.client.set_wake_schedule(
-                serial=serial,
-                hours=hours,
-                minutes=minutes,
-                days=days_str,
+                cron=cron,
                 enabled=enabled,
+                serial=serial,
             )
         except Exception as err:
             raise HomeAssistantError(f"Failed to set wake schedule: {err}") from err
@@ -274,6 +288,7 @@ async def async_setup(hass: HomeAssistant, config: dict[str, Any]) -> bool:
 async def async_setup_entry(hass: HomeAssistant, entry: SageCoffeeConfigEntry) -> bool:
     """Set up Sage Coffee from a config entry."""
     refresh_token = entry.data.get(CONF_REFRESH_TOKEN)
+    client: SageCoffeeClient | None = None
 
     if not refresh_token:
         raise ConfigEntryAuthFailed("No refresh token available")
@@ -287,7 +302,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: SageCoffeeConfigEntry) -
         client = SageCoffeeClient(
             client_id=DEFAULT_CLIENT_ID,
             refresh_token=refresh_token,
-            app=entry.data.get(CONF_MACHINE_TYPE),
+            app=entry.data.get(CONF_BRAND),
             httpx_client=http_client,
             ssl_context=ssl_context,
         )
@@ -301,6 +316,11 @@ async def async_setup_entry(hass: HomeAssistant, entry: SageCoffeeConfigEntry) -
         _LOGGER.debug("Found %d appliances", len(appliances))
 
     except Exception as err:
+        if client is not None:
+            try:
+                await client.close()
+            except Exception:
+                _LOGGER.debug("Error while closing failed setup client", exc_info=True)
         _LOGGER.error("Failed to connect to Sage Coffee API: %s", err)
         raise ConfigEntryNotReady from err
 

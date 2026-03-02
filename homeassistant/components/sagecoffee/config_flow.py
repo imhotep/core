@@ -9,6 +9,7 @@ from sagecoffee.auth import DEFAULT_CLIENT_ID, AuthClient
 import voluptuous as vol
 
 from homeassistant.config_entries import ConfigFlow, ConfigFlowResult
+from homeassistant.data_entry_flow import AbortFlow
 from homeassistant.const import CONF_PASSWORD, CONF_USERNAME
 from homeassistant.helpers.selector import (
     SelectSelector,
@@ -19,7 +20,7 @@ from homeassistant.helpers.selector import (
 )
 
 from .const import (
-    CONF_MACHINE_TYPE,
+    CONF_BRAND,
     CONF_REFRESH_TOKEN,
     DOMAIN,
     MACHINE_TYPE_BREVILLE,
@@ -36,7 +37,7 @@ STEP_USER_DATA_SCHEMA = vol.Schema(
         vol.Required(CONF_PASSWORD): TextSelector(
             TextSelectorConfig(type=TextSelectorType.PASSWORD)
         ),
-        vol.Required(CONF_MACHINE_TYPE): SelectSelector(
+        vol.Required(CONF_BRAND): SelectSelector(
             SelectSelectorConfig(
                 options=[
                     {"label": "Sage", "value": MACHINE_TYPE_SAGE},
@@ -52,7 +53,7 @@ STEP_TOKEN_DATA_SCHEMA = vol.Schema(
         vol.Required(CONF_REFRESH_TOKEN): TextSelector(
             TextSelectorConfig(type=TextSelectorType.PASSWORD)
         ),
-        vol.Required(CONF_MACHINE_TYPE): SelectSelector(
+        vol.Required(CONF_BRAND): SelectSelector(
             SelectSelectorConfig(
                 options=[
                     {"label": "Sage", "value": MACHINE_TYPE_SAGE},
@@ -97,15 +98,23 @@ class SageCoffeeConfigFlow(ConfigFlow, domain=DOMAIN):
                 )
                 self._refresh_token = tokens.refresh_token
 
+                # Use auth0 subject as unique ID to prevent duplicates
+                unique_id = tokens.auth0_sub()
+                if unique_id:
+                    await self.async_set_unique_id(unique_id)
+                    self._abort_if_unique_id_configured()
+
                 # Create the config entry
                 return self.async_create_entry(
                     title="Sage Coffee",
                     data={
                         CONF_REFRESH_TOKEN: self._refresh_token,
-                        CONF_MACHINE_TYPE: user_input[CONF_MACHINE_TYPE],
+                        CONF_BRAND: user_input[CONF_BRAND],
                     },
                 )
 
+            except AbortFlow:
+                raise
             except Exception as err:
                 _LOGGER.exception("Authentication failed: %s", err)
                 errors["base"] = "invalid_auth"
@@ -133,14 +142,22 @@ class SageCoffeeConfigFlow(ConfigFlow, domain=DOMAIN):
                 # Use the potentially rotated token
                 self._refresh_token = tokens.refresh_token or refresh_token
 
+                # Use auth0 subject as unique ID to prevent duplicates
+                unique_id = tokens.auth0_sub()
+                if unique_id:
+                    await self.async_set_unique_id(unique_id)
+                    self._abort_if_unique_id_configured()
+
                 return self.async_create_entry(
                     title="Sage Coffee",
                     data={
                         CONF_REFRESH_TOKEN: self._refresh_token,
-                        CONF_MACHINE_TYPE: user_input[CONF_MACHINE_TYPE],
+                        CONF_BRAND: user_input[CONF_BRAND],
                     },
                 )
 
+            except AbortFlow:
+                raise
             except Exception as err:
                 _LOGGER.exception("Token validation failed: %s", err)
                 errors["base"] = "invalid_auth"
