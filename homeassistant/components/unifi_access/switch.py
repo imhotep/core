@@ -1,110 +1,89 @@
-"""Switch platform for the UniFi Access integration."""
+"""Platform for switch integration."""
 
-from __future__ import annotations
-
-from collections.abc import Callable
-from dataclasses import dataclass
 from typing import Any
 
-from unifi_access_api import EmergencyStatus, UnifiAccessError
-
-from homeassistant.components.switch import SwitchEntity, SwitchEntityDescription
+from homeassistant.components.switch import SwitchEntity
 from homeassistant.core import HomeAssistant
-from homeassistant.exceptions import HomeAssistantError
+from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
+from homeassistant.helpers.update_coordinator import CoordinatorEntity
+from unifi_access_api import EmergencyStatus
 
+from . import UnifiAccessConfigEntry
 from .const import DOMAIN
-from .coordinator import UnifiAccessConfigEntry, UnifiAccessCoordinator, UnifiAccessData
-from .entity import UnifiAccessHubEntity
+from .coordinator import UnifiAccessCoordinator
+from .hub import UnifiAccessHub
 
 PARALLEL_UPDATES = 1
 
 
-@dataclass(frozen=True, kw_only=True)
-class UnifiAccessSwitchEntityDescription(SwitchEntityDescription):
-    """Describes a UniFi Access switch entity."""
-
-    value_fn: Callable[[EmergencyStatus], bool]
-    set_fn: Callable[[EmergencyStatus, bool], EmergencyStatus]
-
-
-SWITCH_DESCRIPTIONS: tuple[UnifiAccessSwitchEntityDescription, ...] = (
-    UnifiAccessSwitchEntityDescription(
-        key="evacuation",
-        translation_key="evacuation",
-        value_fn=lambda s: s.evacuation,
-        set_fn=lambda s, v: EmergencyStatus(evacuation=v, lockdown=s.lockdown),
-    ),
-    UnifiAccessSwitchEntityDescription(
-        key="lockdown",
-        translation_key="lockdown",
-        value_fn=lambda s: s.lockdown,
-        set_fn=lambda s, v: EmergencyStatus(evacuation=s.evacuation, lockdown=v),
-    ),
-)
-
-
 async def async_setup_entry(
     hass: HomeAssistant,
-    entry: UnifiAccessConfigEntry,
+    config_entry: UnifiAccessConfigEntry,
     async_add_entities: AddConfigEntryEntitiesCallback,
 ) -> None:
-    """Set up UniFi Access switch entities."""
-    coordinator = entry.runtime_data
+    """Add switch entity for passed config entry."""
+    data = config_entry.runtime_data
     async_add_entities(
-        UnifiAccessEmergencySwitch(coordinator, description)
-        for description in SWITCH_DESCRIPTIONS
+        [
+            EmergencySwitch(
+                data.hub,
+                data.emergency_coordinator,
+                field="evacuation",
+                unique_id="unifi_access_all_doors_evacuation",
+                translation_key="evacuation",
+            ),
+            EmergencySwitch(
+                data.hub,
+                data.emergency_coordinator,
+                field="lockdown",
+                unique_id="unifi_access_all_doors_lockdown",
+                translation_key="lockdown",
+            ),
+        ]
     )
 
 
-class UnifiAccessEmergencySwitch(UnifiAccessHubEntity, SwitchEntity):
-    """Representation of a UniFi Access emergency switch."""
+class EmergencySwitch(CoordinatorEntity, SwitchEntity):
+    """Unifi Access Emergency Switch (Evacuation / Lockdown)."""
 
-    entity_description: UnifiAccessSwitchEntityDescription
+    _attr_has_entity_name = True
 
     def __init__(
         self,
-        coordinator: UnifiAccessCoordinator,
-        description: UnifiAccessSwitchEntityDescription,
+        hub: UnifiAccessHub,
+        coordinator: UnifiAccessCoordinator[EmergencyStatus],
+        *,
+        field: str,
+        unique_id: str,
+        translation_key: str,
     ) -> None:
-        """Initialize the switch entity."""
-        super().__init__(coordinator)
-        self._attr_unique_id = f"{coordinator.config_entry.entry_id}-{description.key}"
-        self.entity_description = description
+        """Initialize Unifi Access Emergency Switch."""
+        super().__init__(coordinator, context=field)
+        self.hub = hub
+        self._field = field
+        self._attr_unique_id = unique_id
+        self._attr_translation_key = translation_key
+
+    @property
+    def device_info(self) -> DeviceInfo:
+        """Get device information."""
+        return DeviceInfo(
+            identifiers={(DOMAIN, "unifi_access_all_doors")},
+            name="All Doors",
+            model="UAH",
+            manufacturer="Unifi",
+        )
 
     @property
     def is_on(self) -> bool:
-        """Return True if the switch is on."""
-        return self.entity_description.value_fn(self.coordinator.data.emergency)
-
-    async def async_turn_on(self, **kwargs: Any) -> None:
-        """Turn the switch on."""
-        await self._async_set_emergency(True)
+        """Get switch status."""
+        return bool(getattr(self.hub, self._field))
 
     async def async_turn_off(self, **kwargs: Any) -> None:
-        """Turn the switch off."""
-        await self._async_set_emergency(False)
+        """Turn off emergency mode."""
+        await self.hub.async_set_emergency_status(**{self._field: False})
 
-    async def _async_set_emergency(self, value: bool) -> None:
-        """Set emergency status."""
-        new_status = self.entity_description.set_fn(
-            self.coordinator.data.emergency, value
-        )
-        try:
-            await self.coordinator.client.set_emergency_status(new_status)
-        except UnifiAccessError as err:
-            raise HomeAssistantError(
-                translation_domain=DOMAIN,
-                translation_key="emergency_failed",
-            ) from err
-        # Optimistically update state; the WebSocket confirmation via
-        # access.data.setting.update typically arrives ~200ms later.
-        # Guard against flipping coordinator.last_update_success back to True
-        # while the WebSocket is disconnected and all entities are unavailable.
-        if self.coordinator.last_update_success:
-            self.coordinator.async_set_updated_data(
-                UnifiAccessData(
-                    doors=self.coordinator.data.doors,
-                    emergency=new_status,
-                )
-            )
+    async def async_turn_on(self, **kwargs: Any) -> None:
+        """Turn on emergency mode."""
+        await self.hub.async_set_emergency_status(**{self._field: True})
